@@ -205,9 +205,9 @@
 <style>
   .users-container {
     width: 100%;
-    max-width: 900px;
-    margin: 1.5rem auto;
-    padding: 0 1rem;
+    max-width: 100%;
+    margin: 1rem 0;
+    padding: 0 1.5rem;
     box-sizing: border-box;
   }
 

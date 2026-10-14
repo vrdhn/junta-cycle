@@ -449,10 +449,12 @@ def cmd_build() -> None:
         if index_html.is_file():
             content = index_html.read_text(encoding="utf-8")
             (dist_dir / "404.html").write_text(content, encoding="utf-8")
+            # For 1-level deep subdirectories (e.g. /debug, /users), adjust relative paths to ../assets/
+            sub_content = content.replace('src="./assets/', 'src="../assets/').replace('href="./assets/', 'href="../assets/')
             for sub in ("debug", "users"):
                 sub_dir = dist_dir / sub
                 sub_dir.mkdir(parents=True, exist_ok=True)
-                (sub_dir / "index.html").write_text(content, encoding="utf-8")
+                (sub_dir / "index.html").write_text(sub_content, encoding="utf-8")
         print_ok("Frontend built successfully into frontend/dist (with SPA routing for /debug and /users)")
     else:
         sys.exit(res.returncode)
