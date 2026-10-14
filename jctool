@@ -554,12 +554,68 @@ def cmd_db_query(passphrase: str = "") -> None:
         sys.exit(res.returncode)
 
 
+def split_sql_statements(sql: str) -> list[str]:
+    """Split a SQL script into individual executable statements, respecting quotes and $$ blocks."""
+    statements, current = [], []
+    in_single_quote, in_dollar_quote = False, False
+    dollar_tag = ""
+    i, n = 0, len(sql)
+
+    while i < n:
+        if not in_single_quote and not in_dollar_quote and sql[i : i + 2] == "--":
+            eol = sql.find("\n", i)
+            if eol == -1:
+                break
+            current.append(sql[i : eol + 1])
+            i = eol + 1
+            continue
+
+        if not in_single_quote:
+            if not in_dollar_quote and sql[i] == "$":
+                m = re.match(r"(\$[A-Za-z0-9_]*\$)", sql[i:])
+                if m:
+                    dollar_tag = m.group(1)
+                    in_dollar_quote = True
+                    current.append(dollar_tag)
+                    i += len(dollar_tag)
+                    continue
+            elif in_dollar_quote and sql[i:].startswith(dollar_tag):
+                current.append(dollar_tag)
+                i += len(dollar_tag)
+                in_dollar_quote = False
+                dollar_tag = ""
+                continue
+
+        if not in_dollar_quote and sql[i] == "'":
+            if in_single_quote and i + 1 < n and sql[i + 1] == "'":
+                current.append("''")
+                i += 2
+                continue
+            in_single_quote = not in_single_quote
+
+        if sql[i] == ";" and not in_single_quote and not in_dollar_quote:
+            stmt = "".join(current).strip()
+            if stmt:
+                statements.append(stmt)
+            current = []
+            i += 1
+            continue
+
+        current.append(sql[i])
+        i += 1
+
+    last_stmt = "".join(current).strip()
+    if last_stmt:
+        statements.append(last_stmt)
+    return statements
+
+
 def cmd_db_migrate(passphrase: str = "") -> None:
-    """Apply backend/schema.sql and migrations to Supabase database."""
+    """Apply backend/schema.sql and migrations to Supabase database statement by statement."""
     ensure_cached_path()
     sb_exe = BIN_DIR / "supabase"
     if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
-        print_err(f"Supabase CLI not found. Run './jctool install' first.")
+        print_err("Supabase CLI not found. Run './jctool install' first.")
         sys.exit(1)
 
     schema_file = Path("backend/schema.sql")
@@ -567,15 +623,25 @@ def cmd_db_migrate(passphrase: str = "") -> None:
         print_err(f"Schema file not found at {schema_file}")
         sys.exit(1)
 
-    print(f"Applying database schema from {schema_file}...")
     db_url = get_db_url(passphrase)
-    cmd = [str(sb_exe), "db", "query", "--db-url", db_url, "-f", str(schema_file)]
-    res = subprocess.run(cmd, check=False)
-    if res.returncode == 0:
-        print_ok("Database migration applied successfully!")
-    else:
-        print_err("Database migration failed!")
-        sys.exit(res.returncode)
+    statements = split_sql_statements(schema_file.read_text(encoding="utf-8"))
+    print(f"Applying {len(statements)} database statements from {schema_file}...")
+
+    temp_stmt = Path(f"/tmp/jc_stmt_{os.getpid()}.sql")
+    try:
+        for idx, stmt in enumerate(statements, 1):
+            temp_stmt.write_text(stmt, encoding="utf-8")
+            cmd = [str(sb_exe), "db", "query", "--db-url", db_url, "-f", str(temp_stmt)]
+            res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if res.returncode != 0:
+                print_err(f"Failed executing statement [{idx}/{len(statements)}]:\n{stmt[:120]}...")
+                print(res.stderr.strip())
+                sys.exit(res.returncode)
+        print_ok(f"Database migration applied successfully ({len(statements)} statements)!")
+    finally:
+        if temp_stmt.is_file():
+            temp_stmt.unlink()
+
 
 
 def cmd_publish() -> None:
