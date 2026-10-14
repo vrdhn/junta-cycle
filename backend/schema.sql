@@ -8,6 +8,7 @@ create table if not exists public.allowed_roles (
   created_at timestamptz default now()
 );
 
+-- statement
 -- Seed predefined roles
 insert into public.allowed_roles (role, description) values
   ('rider', 'Can find, unlock, ride, and return cycles'),
@@ -15,6 +16,7 @@ insert into public.allowed_roles (role, description) values
   ('superuser', 'Full administrative system access')
 on conflict (role) do nothing;
 
+-- statement
 -- 2. Validation function to enforce roles against allowed_roles table
 create or replace function public.validate_roles(p_roles text[])
 returns boolean
@@ -28,6 +30,7 @@ as $$
   );
 $$;
 
+-- statement
 -- 3. Profiles table with roles array
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -38,6 +41,7 @@ create table if not exists public.profiles (
   constraint valid_roles check (public.validate_roles(roles))
 );
 
+-- statement
 -- 4. Fast helper function for authorization checks
 create or replace function public.has_role(check_role text)
 returns boolean
@@ -53,6 +57,7 @@ as $$
   );
 $$;
 
+-- statement
 -- 5. Auto-create profile trigger on new user signup
 create or replace function public.handle_new_user()
 returns trigger
@@ -67,27 +72,40 @@ begin
 end;
 $$;
 
+-- statement
 drop trigger if exists on_auth_user_created on auth.users;
+
+-- statement
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- statement
 -- 6. Enable Row Level Security (RLS)
 alter table public.allowed_roles enable row level security;
+
+-- statement
 alter table public.profiles enable row level security;
 
--- Policies for allowed_roles
+-- statement
 drop policy if exists "Anyone can read allowed roles" on public.allowed_roles;
+
+-- statement
 create policy "Anyone can read allowed roles"
   on public.allowed_roles for select using (true);
 
--- Policies for profiles
+-- statement
 drop policy if exists "Users can read own profile or managers can read all" on public.profiles;
+
+-- statement
 create policy "Users can read own profile or managers can read all"
   on public.profiles for select
   using (auth.uid() = id or public.has_role('manager'));
 
+-- statement
 drop policy if exists "Users can update own profile" on public.profiles;
+
+-- statement
 create policy "Users can update own profile"
   on public.profiles for update
   using (auth.uid() = id);

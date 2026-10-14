@@ -55,6 +55,8 @@
 - **Integrity**: `validate_roles()` check constraint ensures all elements in `profiles.roles` exist in `allowed_roles`.
 - **Authorization**: `public.has_role(check_role)` helper function enables fast RLS checks (superuser automatically matches).
 - **Trigger**: `on_auth_user_created` trigger automatically provisions a `profiles` entry with `roles = array['rider']` on signup.
+- **Migration Format**: SQL scripts in `backend/` use an explicit `-- statement` comment marker between independent commands to allow clean statement-by-statement execution.
+
 
 ## Current Status & Next Steps
 - Defined user roles, profiles, validation constraint, and signup trigger in `backend/schema.sql`.

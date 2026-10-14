@@ -555,59 +555,10 @@ def cmd_db_query(passphrase: str = "") -> None:
 
 
 def split_sql_statements(sql: str) -> list[str]:
-    """Split a SQL script into individual executable statements, respecting quotes and $$ blocks."""
-    statements, current = [], []
-    in_single_quote, in_dollar_quote = False, False
-    dollar_tag = ""
-    i, n = 0, len(sql)
+    """Split a SQL script using explicit '-- statement' or '-- ---' comment markers."""
+    chunks = re.split(r"(?m)^--\s*(?:statement|---)\s*$", sql)
+    return [c.strip() for c in chunks if c.strip()]
 
-    while i < n:
-        if not in_single_quote and not in_dollar_quote and sql[i : i + 2] == "--":
-            eol = sql.find("\n", i)
-            if eol == -1:
-                break
-            current.append(sql[i : eol + 1])
-            i = eol + 1
-            continue
-
-        if not in_single_quote:
-            if not in_dollar_quote and sql[i] == "$":
-                m = re.match(r"(\$[A-Za-z0-9_]*\$)", sql[i:])
-                if m:
-                    dollar_tag = m.group(1)
-                    in_dollar_quote = True
-                    current.append(dollar_tag)
-                    i += len(dollar_tag)
-                    continue
-            elif in_dollar_quote and sql[i:].startswith(dollar_tag):
-                current.append(dollar_tag)
-                i += len(dollar_tag)
-                in_dollar_quote = False
-                dollar_tag = ""
-                continue
-
-        if not in_dollar_quote and sql[i] == "'":
-            if in_single_quote and i + 1 < n and sql[i + 1] == "'":
-                current.append("''")
-                i += 2
-                continue
-            in_single_quote = not in_single_quote
-
-        if sql[i] == ";" and not in_single_quote and not in_dollar_quote:
-            stmt = "".join(current).strip()
-            if stmt:
-                statements.append(stmt)
-            current = []
-            i += 1
-            continue
-
-        current.append(sql[i])
-        i += 1
-
-    last_stmt = "".join(current).strip()
-    if last_stmt:
-        statements.append(last_stmt)
-    return statements
 
 
 def cmd_db_migrate(passphrase: str = "") -> None:
