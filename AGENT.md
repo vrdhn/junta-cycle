@@ -29,6 +29,13 @@
   - `./jctool install`: Installs Node.js & npm into `~/.cache/junta-cycle/nodejs` (isolated, non-system).
   - `./jctool check`: Verifies Node/npm runtime in cache, Git/GitHub credentials, and Supabase keys in `config.json`.
   - `./jctool encrypt`: Encrypts plaintext strings under `"secrets"` in `config.json` with prefix `enc-v1:` using OpenSSL AES-256-CBC PBKDF2, and saves `password_check`.
+  - `./jctool build`: Builds the Svelte frontend into `frontend/dist` using cached node/npm.
+  - `./jctool dev`: Launches Vite dev server for local frontend testing.
+  - `./jctool publish`: Builds the frontend and deploys directly to `gh-pages` branch on GitHub remote.
+
+## Directory Structure
+- `frontend/`: Svelte + TypeScript + Vite web app (landing page, mobile-friendly styles).
+- `backend/`: SQL schemas, migrations, and Supabase functions.
 
 ## Configuration & Secrets Management
 - File: `config.json`
@@ -40,9 +47,10 @@
 - Encrypted format: `enc-v1:<base64-ciphertext>`
 
 ## Current Status & Next Steps
-- Node.js (v22.11.0) and npm (10.9.0) managed in `~/.cache/junta-cycle/nodejs`.
-- Supabase project URL, Publishable Key, and Database Password configured and encrypted in `config.json`.
-- All checks in `./jctool check` passing.
+- Frontend created in `frontend/` with landing page (`frontend/src/App.svelte`).
+- Verified `./jctool build` successfully generates `frontend/dist`.
+- Next: Wire up Supabase Auth to the Login button on the landing page.
+
 
 
 

@@ -353,6 +353,77 @@ def cmd_check() -> None:
     print("\nCheck complete.")
 
 
+def cmd_build() -> None:
+    """Build the frontend application into frontend/dist."""
+    ensure_cached_path()
+    npm_exe = NODE_BIN_DIR / "npm"
+    if not npm_exe.is_file():
+        print_err(f"npm not found in {NODE_BIN_DIR}. Run './jctool install' first.")
+        sys.exit(1)
+    print("Building frontend...")
+    res = subprocess.run([str(npm_exe), "--prefix", "frontend", "run", "build"], check=False)
+    if res.returncode == 0:
+        print_ok("Frontend built successfully into frontend/dist")
+    else:
+        sys.exit(res.returncode)
+
+
+def cmd_dev() -> None:
+    """Start frontend development server."""
+    ensure_cached_path()
+    npm_exe = NODE_BIN_DIR / "npm"
+    if not npm_exe.is_file():
+        print_err(f"npm not found in {NODE_BIN_DIR}. Run './jctool install' first.")
+        sys.exit(1)
+    subprocess.run([str(npm_exe), "--prefix", "frontend", "run", "dev"], check=False)
+
+
+def git_tree_from_dir(directory: Path) -> str:
+    """Create a git tree object directly from a directory."""
+    temp_index = Path(f"/tmp/jc_git_index_{os.getpid()}")
+    try:
+        env = os.environ.copy()
+        env["GIT_INDEX_FILE"] = str(temp_index)
+        subprocess.run(["git", f"--work-tree={directory}", "add", "-A"], env=env, check=True)
+        res = subprocess.run(["git", "write-tree"], env=env, capture_output=True, text=True, check=True)
+        return res.stdout.strip()
+    finally:
+        if temp_index.exists():
+            temp_index.unlink()
+
+
+def cmd_publish() -> None:
+    """Build frontend and publish directly to gh-pages branch."""
+    cmd_build()
+    dist_dir = Path("frontend/dist")
+    if not (dist_dir / "index.html").is_file():
+        print_err("frontend/dist/index.html not found after build")
+        sys.exit(1)
+
+    print("Publishing to gh-pages branch...")
+    tree_sha = git_tree_from_dir(dist_dir)
+
+    run_command(["git", "fetch", "origin", "gh-pages"])
+    code, parent = run_command(["git", "rev-parse", "--verify", "origin/gh-pages"])
+
+    commit_msg = "Deploy frontend to gh-pages"
+    commit_cmd = ["git", "commit-tree", tree_sha, "-m", commit_msg]
+    if code == 0 and parent:
+        commit_cmd.extend(["-p", parent])
+
+    c_res = subprocess.run(commit_cmd, capture_output=True, text=True, check=True)
+    commit_sha = c_res.stdout.strip()
+
+    print(f"Pushing commit {commit_sha[:7]} to origin/gh-pages...")
+    push_res = subprocess.run(["git", "push", "origin", f"{commit_sha}:refs/heads/gh-pages"], check=False)
+    if push_res.returncode == 0:
+        print_ok("Successfully published to gh-pages!")
+        print("URL: https://vrdhn.github.io/junta-cycle/")
+    else:
+        print_err("Failed to push to gh-pages. Check SSH/Git credentials.")
+        sys.exit(push_res.returncode)
+
+
 def show_help() -> None:
     """Show CLI usage."""
     print_header("junta-cycle tool (jctool)")
@@ -361,6 +432,9 @@ def show_help() -> None:
     print("  install  Install Node.js & npm into ~/.cache/junta-cycle")
     print("  check    Verify required tools and credentials (Node, Git/GitHub, Supabase)")
     print("  encrypt  Encrypt plaintext secrets in config.json (prefixed with enc-v1:)")
+    print("  build    Build the frontend app into frontend/dist")
+    print("  dev      Start local development server for frontend")
+    print("  publish  Build frontend and deploy directly to gh-pages branch")
     print("  help     Show this help message")
 
 
@@ -370,17 +444,22 @@ def main() -> None:
         "install": cmd_install,
         "check": cmd_check,
         "encrypt": cmd_encrypt,
+        "build": cmd_build,
+        "dev": cmd_dev,
+        "publish": cmd_publish,
         "help": show_help,
         "--help": show_help,
         "-h": show_help,
     }
     action = commands.get(cmd)
+
     if action:
         action()
     else:
         print(f"Unknown command: {cmd}\n")
         show_help()
         sys.exit(1)
+
 
 
 if __name__ == "__main__":

@@ -1,0 +1,2 @@
+-- junta-cycle backend schema
+-- (Will contain tables: cycles, rides, and security definer functions)
