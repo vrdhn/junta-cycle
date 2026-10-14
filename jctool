@@ -404,7 +404,7 @@ def cmd_check() -> None:
     print("\nCheck complete.")
 
 
-def get_decrypted_frontend_env() -> dict[str, str]:
+def get_decrypted_frontend_env(passphrase: str = "") -> dict[str, str]:
     """Retrieve decrypted Supabase URL and Publishable Key for frontend build/dev."""
     url = os.environ.get("VITE_SUPABASE_URL", "")
     key = os.environ.get("VITE_SUPABASE_ANON_KEY", "")
@@ -420,7 +420,8 @@ def get_decrypted_frontend_env() -> dict[str, str]:
         print_warn("Supabase credentials not configured in config.json")
         return {}
 
-    passphrase = prompt_passphrase("Enter passphrase to decrypt frontend configuration: ")
+    if not passphrase:
+        passphrase = prompt_passphrase("Enter passphrase to decrypt frontend configuration: ")
     check_val = config.get("secrets", {}).get("password_check", "")
     if check_val and not verify_password(check_val, passphrase):
         print_err("Incorrect passphrase!")
@@ -432,14 +433,14 @@ def get_decrypted_frontend_env() -> dict[str, str]:
     }
 
 
-def cmd_build() -> None:
+def cmd_build(passphrase: str = "") -> None:
     """Build the frontend application into frontend/dist."""
     ensure_cached_path()
     npm_exe = NODE_BIN_DIR / "npm"
     if not npm_exe.is_file():
         print_err(f"npm not found in {NODE_BIN_DIR}. Run './jctool install' first.")
         sys.exit(1)
-    frontend_env = get_decrypted_frontend_env()
+    frontend_env = get_decrypted_frontend_env(passphrase)
     env = {**os.environ, **frontend_env}
     print("Building frontend...")
     res = subprocess.run([str(npm_exe), "--prefix", "frontend", "run", "build"], env=env, check=False)
@@ -487,9 +488,9 @@ def git_tree_from_dir(directory: Path) -> str:
             temp_index.unlink()
 
 
-def publish_frontend() -> None:
+def publish_frontend(passphrase: str = "") -> None:
     """Build frontend and publish directly to gh-pages branch."""
-    cmd_build()
+    cmd_build(passphrase)
     dist_dir = Path("frontend/dist")
     if not (dist_dir / "index.html").is_file():
         print_err("frontend/dist/index.html not found after build")
@@ -658,13 +659,18 @@ def cmd_db_demo(passphrase: str = "") -> None:
     print("\nSummary: 1 superuser, 3 managers, 9 riders across 10 users.")
 
 
-def cmd_func_deploy(passphrase: str = "") -> None:
+def cmd_func_deploy(passphrase: str = "", fn_name: str = "") -> None:
     """Deploy Supabase Edge Functions (e.g. ./jctool func-deploy [function-name])."""
     ensure_cached_path()
     sb_exe = BIN_DIR / "supabase"
     if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
         print_err("Supabase CLI not found. Run './jctool install' first.")
         sys.exit(1)
+
+    functions_dir = Path("supabase/functions")
+    if not functions_dir.is_dir():
+        print_warn("No supabase/functions directory found, skipping function deployment.")
+        return
 
     config = load_config(enforce_encrypted=True)
     sb_cfg = config.get("secrets", {}).get("supabase", {})
@@ -680,26 +686,38 @@ def cmd_func_deploy(passphrase: str = "") -> None:
     if enc_token:
         env["SUPABASE_ACCESS_TOKEN"] = decrypt_value(enc_token, passphrase)
 
-    fn_name = sys.argv[2] if len(sys.argv) > 2 else "debug"
-    print_header(f"Deploying Edge Function: {fn_name} (Project: {project_ref})")
-    cmd = [str(sb_exe), "functions", "deploy", fn_name, "--project-ref", project_ref, "--no-verify-jwt"]
+    if not fn_name and len(sys.argv) > 2 and sys.argv[1] == "func-deploy":
+        fn_name = sys.argv[2]
+
+    target = fn_name if fn_name else "all functions"
+    print_header(f"Deploying Edge Functions ({target}) -> Project: {project_ref}")
+    cmd = [str(sb_exe), "functions", "deploy", "--project-ref", project_ref, "--no-verify-jwt"]
+    if fn_name:
+        cmd.append(fn_name)
+
     res = subprocess.run(cmd, env=env, check=False)
     if res.returncode != 0:
-        print_err(f"Function deploy failed for {fn_name}.")
+        print_err("Function deploy failed. (Note: Supabase CLI requires SUPABASE_ACCESS_TOKEN or run 'supabase login')")
         sys.exit(res.returncode)
-    print_ok(f"Function '{fn_name}' deployed successfully!")
+    print_ok(f"Edge functions deployed successfully!")
 
 
 def cmd_publish() -> None:
-    """Publish both backend (migrate) and frontend (gh-pages)."""
+    """Publish backend migrations, edge functions, and frontend (gh-pages)."""
     print_header("junta-cycle tool (jctool publish)")
+    passphrase = prompt_passphrase("Enter passphrase to publish project: ")
+
     # 1. Attempt database migration first
     print("\n--- Step 1: Database Migration ---")
-    cmd_db_migrate()
+    cmd_db_migrate(passphrase=passphrase)
 
-    # 2. If migration succeeds, publish frontend
-    print("\n--- Step 2: Frontend Publish ---")
-    publish_frontend()
+    # 2. Deploy edge functions
+    print("\n--- Step 2: Edge Functions Deploy ---")
+    cmd_func_deploy(passphrase=passphrase)
+
+    # 3. Publish frontend to gh-pages
+    print("\n--- Step 3: Frontend Publish ---")
+    publish_frontend(passphrase=passphrase)
     print_ok("Full project publish completed successfully!")
 
 

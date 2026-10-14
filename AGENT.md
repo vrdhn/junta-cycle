@@ -36,8 +36,8 @@
   - `./jctool db-status`: Displays migration status (local vs remote) using `supabase migration list`.
   - `./jctool db-demo`: Populates database with 10 demo users (Indian names, 1 superuser, 3 managers, 9 riders, password `junta123`).
   - `./jctool db-new <name>`: Generates a new timestamped migration file in `supabase/migrations/`.
-  - `./jctool db-query`: Executes SQL queries or files against Supabase (e.g. `./jctool db-query 'SELECT 1;'`).
-  - `./jctool publish`: Runs `db-migrate` first; if successful, builds and publishes frontend to `gh-pages`.
+  - `./jctool func-deploy [name]`: Deploys Edge Functions to Supabase (e.g. `./jctool func-deploy debug`).
+  - `./jctool publish`: Full release command: 1) applies DB migrations, 2) deploys edge functions, 3) builds and publishes frontend to `gh-pages`.
 
 
 ## Directory Structure
