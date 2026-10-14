@@ -178,22 +178,24 @@ begin
   on conflict (place_id, name) do update set capacity = excluded.capacity;
 
   -- Seed Cycles for Private Parking Stands (Tower A: Bhavna, Clubhouse: Chirag, Sector 2: Divya)
-  insert into public.cycles (cycle_number, parking_id, company_name, color, model_number, status) values
-    ('JC-101', park_tower_a, 'Hero Cycles', 'Matte Black', 'Sprint Pro 27.5', 'running'),
-    ('JC-102', park_tower_a, 'Hercules', 'Neon Blue', 'Roadeo Hardtail', 'running'),
-    ('JC-103', park_tower_a, 'Decathlon Btwin', 'Flame Orange', 'Rockrider ST30', 'puncture'),
-    ('JC-104', park_tower_a, 'Firefox', 'Pearl White', 'Target 29 D', 'broken'),
-    ('JC-105', park_tower_a, 'Trek', 'Forest Green', 'Marlin 4 Gen 2', 'running'),
+  insert into public.cycles (cycle_number, qr_id, lock_code, parking_id, company_name, color, model_number, status) values
+    ('JC-101', '11111111-1111-1111-1111-111111111101', '4821', park_tower_a, 'Hero Cycles', 'Matte Black', 'Sprint Pro 27.5', 'running'),
+    ('JC-102', '11111111-1111-1111-1111-111111111102', '3912', park_tower_a, 'Hercules', 'Neon Blue', 'Roadeo Hardtail', 'running'),
+    ('JC-103', '11111111-1111-1111-1111-111111111103', '7744', park_tower_a, 'Decathlon Btwin', 'Flame Orange', 'Rockrider ST30', 'puncture'),
+    ('JC-104', '11111111-1111-1111-1111-111111111104', '9103', park_tower_a, 'Firefox', 'Pearl White', 'Target 29 D', 'broken'),
+    ('JC-105', '11111111-1111-1111-1111-111111111105', '6219', park_tower_a, 'Trek', 'Forest Green', 'Marlin 4 Gen 2', 'running'),
 
-    ('JC-201', park_clubhouse, 'Hero Lectro', 'Metallic Silver', 'C6 E-Cycle', 'running'),
-    ('JC-202', park_clubhouse, 'Hercules', 'Royal Red', 'Street Cat Pro', 'running'),
-    ('JC-203', park_clubhouse, 'Decathlon Btwin', 'Dark Grey', 'Riverside 120', 'running'),
-    ('JC-204', park_clubhouse, 'Firefox', 'Electric Yellow', 'Sniper 21S', 'puncture'),
+    ('JC-201', '22222222-2222-2222-2222-222222222201', '5120', park_clubhouse, 'Hero Lectro', 'Metallic Silver', 'C6 E-Cycle', 'running'),
+    ('JC-202', '22222222-2222-2222-2222-222222222202', '8341', park_clubhouse, 'Hercules', 'Royal Red', 'Street Cat Pro', 'running'),
+    ('JC-203', '22222222-2222-2222-2222-222222222203', '2490', park_clubhouse, 'Decathlon Btwin', 'Dark Grey', 'Riverside 120', 'running'),
+    ('JC-204', '22222222-2222-2222-2222-222222222204', '1899', park_clubhouse, 'Firefox', 'Electric Yellow', 'Sniper 21S', 'puncture'),
 
-    ('JC-301', park_sector2, 'Hero Cycles', 'Sky Blue', 'Sprint Next D', 'running'),
-    ('JC-302', park_sector2, 'Hercules', 'Matte Green', 'Storm City Commute', 'running'),
-    ('JC-303', park_sector2, 'Decathlon Btwin', 'Crimson Red', 'MyBike 700 V2', 'broken')
+    ('JC-301', '33333333-3333-3333-3333-333333333301', '6620', park_sector2, 'Hero Cycles', 'Sky Blue', 'Sprint Next D', 'running'),
+    ('JC-302', '33333333-3333-3333-3333-333333333302', '4109', park_sector2, 'Hercules', 'Matte Green', 'Storm City Commute', 'running'),
+    ('JC-303', '33333333-3333-3333-3333-333333333303', '7531', park_sector2, 'Decathlon Btwin', 'Crimson Red', 'MyBike 700 V2', 'broken')
   on conflict (cycle_number) do update set
+    qr_id = excluded.qr_id,
+    lock_code = excluded.lock_code,
     parking_id = excluded.parking_id,
     company_name = excluded.company_name,
     color = excluded.color,

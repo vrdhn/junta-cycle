@@ -1,4 +1,5 @@
 <script lang="ts">
+  import QRCode from "qrcode";
   import { onMount } from "svelte";
   import { supabase } from "./supabase";
 
@@ -21,6 +22,8 @@
     id: string;
     parking_id: string;
     cycle_number: string;
+    qr_id: string;
+    lock_code: string;
     company_name: string;
     color: string;
     model_number: string;
@@ -41,7 +44,12 @@
   let newCompany = $state("");
   let newColor = $state("");
   let newModel = $state("");
+  let newLockCode = $state("");
   let newStatus = $state<"running" | "broken" | "puncture" | "maintenance">("running");
+
+  // Printable QR modal state
+  let selectedCycleForQr = $state<Cycle | null>(null);
+  let qrImageUrl = $state<string>("");
 
   async function loadStands() {
     loading = true;
@@ -143,14 +151,19 @@
     errorMsg = null;
     successMsg = null;
     try {
-      const { error } = await supabase.from("cycles").insert({
+      const payload: any = {
         parking_id: selectedStandId,
         cycle_number: newCycleNumber.trim().toUpperCase(),
         company_name: newCompany.trim(),
         color: newColor.trim(),
         model_number: newModel.trim(),
         status: newStatus,
-      });
+      };
+      if (newLockCode.trim()) {
+        payload.lock_code = newLockCode.trim();
+      }
+
+      const { error } = await supabase.from("cycles").insert(payload);
 
       if (error) throw error;
       successMsg = `Added cycle ${newCycleNumber.trim().toUpperCase()} to this stand!`;
@@ -158,12 +171,43 @@
       newCompany = "";
       newColor = "";
       newModel = "";
+      newLockCode = "";
       newStatus = "running";
       showAddForm = false;
       await loadCycles(selectedStandId);
     } catch (e: any) {
       errorMsg = e.message || String(e);
     }
+  }
+
+  async function openQrPopup(cycle: Cycle) {
+    selectedCycleForQr = cycle;
+    try {
+      qrImageUrl = await QRCode.toDataURL(cycle.qr_id, {
+        width: 250,
+        margin: 1,
+        color: {
+          dark: "#0f172a",
+          light: "#ffffff",
+        },
+      });
+    } catch (err: any) {
+      console.error("Failed to generate QR code", err);
+    }
+  }
+
+  function closeQrPopup() {
+    selectedCycleForQr = null;
+    qrImageUrl = "";
+  }
+
+  function printSticker() {
+    window.print();
+  }
+
+  function getStandName(parkingId: string): string {
+    const stand = managedStands.find((s) => s.id === parkingId);
+    return stand ? `${stand.name} (${stand.place_name || ""})` : "";
   }
 
   onMount(() => {
@@ -210,6 +254,7 @@
         <input type="text" placeholder="Company (e.g. Hero, Trek, Btwin)" bind:value={newCompany} />
         <input type="text" placeholder="Color (e.g. Matte Black, Red)" bind:value={newColor} />
         <input type="text" placeholder="Model (e.g. Sprint Pro, ST30)" bind:value={newModel} />
+        <input type="text" placeholder="Lock Code (e.g. 4821 - default 1234)" bind:value={newLockCode} />
         <select bind:value={newStatus}>
           <option value="running">Status: Running (Available)</option>
           <option value="puncture">Status: Puncture</option>
@@ -264,7 +309,9 @@
               <th>Company</th>
               <th>Color</th>
               <th>Model Number</th>
+              <th>Lock Code</th>
               <th>Status</th>
+              <th>QR Sticker</th>
               <th>Quick Status Update</th>
             </tr>
           </thead>
@@ -283,6 +330,9 @@
                 </td>
                 <td class="col-model">{cy.model_number}</td>
                 <td>
+                  <span class="lock-code-badge">🔒 {cy.lock_code || "1234"}</span>
+                </td>
+                <td>
                   <span class={`badge-status status-${cy.status}`}>
                     {#if cy.status === "running"}
                       🟢 Running
@@ -294,6 +344,11 @@
                       🟠 Maintenance
                     {/if}
                   </span>
+                </td>
+                <td>
+                  <button class="btn-qr-action" onclick={() => openQrPopup(cy)} title="View printable QR Sticker">
+                    🏷️ QR Code
+                  </button>
                 </td>
                 <td class="col-actions">
                   <select
@@ -314,6 +369,78 @@
       </div>
     {/if}
   </div>
+
+  <!-- Printable QR Popup Modal -->
+  {#if selectedCycleForQr}
+    <div
+      class="modal-backdrop"
+      onclick={closeQrPopup}
+      onkeydown={(e) => e.key === "Escape" && closeQrPopup()}
+      role="button"
+      tabindex="0"
+    >
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        class="modal-content-container"
+        onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => e.stopPropagation()}
+        role="document"
+        tabindex="-1"
+      >
+        <!-- Printable Sticker Element -->
+        <div class="sticker-card">
+          <div class="sticker-header">
+            <div class="sticker-brand">🚴 JUNTA CYCLE</div>
+            <div class="sticker-tag">{selectedCycleForQr.cycle_number}</div>
+          </div>
+
+          <div class="sticker-qr-box">
+            {#if qrImageUrl}
+              <img src={qrImageUrl} alt={`QR Code for ${selectedCycleForQr.cycle_number}`} class="sticker-qr-img" />
+            {:else}
+              <div class="qr-loading">Generating QR...</div>
+            {/if}
+          </div>
+
+          <div class="sticker-uuid-box">
+            <span class="uuid-lbl">QR UUID:</span>
+            <span class="uuid-txt">{selectedCycleForQr.qr_id}</span>
+          </div>
+
+          <div class="sticker-info-rows">
+            <div class="sticker-info-row">
+              <span class="info-k">Cycle:</span>
+              <span class="info-v">{selectedCycleForQr.company_name} - {selectedCycleForQr.model_number} ({selectedCycleForQr.color})</span>
+            </div>
+            <div class="sticker-info-row lock-highlight">
+              <span class="info-k">Lock Combination:</span>
+              <span class="info-v lock-text">🔒 {selectedCycleForQr.lock_code}</span>
+            </div>
+            {#if getStandName(selectedCycleForQr.parking_id)}
+              <div class="sticker-info-row">
+                <span class="info-k">Home Stand:</span>
+                <span class="info-v">{getStandName(selectedCycleForQr.parking_id)}</span>
+              </div>
+            {/if}
+          </div>
+
+          <div class="sticker-footer-note">
+            Scan QR code with Junta Cycle App to unlock ride
+          </div>
+        </div>
+
+        <!-- Non-printed modal controls -->
+        <div class="modal-actions no-print">
+          <button class="btn-print" onclick={printSticker}>
+            🖨️ Print QR Sticker
+          </button>
+          <button class="btn-close-modal" onclick={closeQrPopup}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <script lang="ts" module>
@@ -625,4 +752,307 @@
 
   .alert-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
   .alert-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+  .lock-code-badge {
+    display: inline-flex;
+    align-items: center;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-weight: 700;
+    font-family: monospace;
+    font-size: 0.85rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    letter-spacing: 0.05em;
+  }
+
+  .btn-qr-action {
+    background: #0f172a;
+    color: white;
+    border: none;
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.375rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-qr-action:hover {
+    background: #334155;
+  }
+
+  /* Modal Backdrop */
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+  }
+
+  .modal-content-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    max-width: 380px;
+    width: 100%;
+  }
+
+  /* Sticker Card Layout */
+  .sticker-card {
+    background: #ffffff;
+    color: #0f172a;
+    width: 100%;
+    max-width: 360px;
+    border: 2px dashed #94a3b8;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .sticker-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .sticker-brand {
+    font-weight: 900;
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+    color: #0f172a;
+  }
+
+  .sticker-tag {
+    font-family: monospace;
+    font-weight: 900;
+    font-size: 1.15rem;
+    background: #0f172a;
+    color: #ffffff;
+    padding: 0.15rem 0.55rem;
+    border-radius: 0.25rem;
+  }
+
+  .sticker-qr-box {
+    background: #ffffff;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .sticker-qr-img {
+    width: 180px;
+    height: 180px;
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  .qr-loading {
+    width: 180px;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: #64748b;
+  }
+
+  .sticker-uuid-box {
+    width: 100%;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.35rem;
+    padding: 0.35rem 0.5rem;
+    margin-bottom: 0.75rem;
+    font-family: monospace;
+    font-size: 0.7rem;
+    word-break: break-all;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .uuid-lbl {
+    font-weight: 700;
+    color: #64748b;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+  }
+
+  .uuid-txt {
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  .sticker-info-rows {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.825rem;
+    text-align: left;
+    margin-bottom: 0.75rem;
+  }
+
+  .sticker-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px dotted #e2e8f0;
+    padding-bottom: 0.25rem;
+  }
+
+  .info-k {
+    color: #64748b;
+    font-weight: 600;
+  }
+
+  .info-v {
+    font-weight: 700;
+    color: #0f172a;
+    text-align: right;
+  }
+
+  .lock-highlight {
+    background: #fef3c7;
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.35rem;
+    border: 1px solid #fde68a;
+  }
+
+  .lock-highlight .info-k {
+    color: #92400e;
+    font-weight: 800;
+  }
+
+  .lock-text {
+    font-family: monospace;
+    font-size: 1.05rem;
+    letter-spacing: 0.1em;
+    color: #b45309;
+    font-weight: 900;
+  }
+
+  .sticker-footer-note {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 600;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 0.5rem;
+    width: 100%;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-print {
+    background: #0d9488;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: 0.375rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: background 0.15s;
+  }
+
+  .btn-print:hover {
+    background: #0f766e;
+  }
+
+  .btn-close-modal {
+    background: #ffffff;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    padding: 0.6rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  .btn-close-modal:hover {
+    background: #f1f5f9;
+  }
+
+  /* Print Media Query */
+  @media print {
+    :global(body) {
+      background: white !important;
+      color: black !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    :global(body *) {
+      visibility: hidden !important;
+    }
+
+    .modal-backdrop,
+    .modal-backdrop * {
+      visibility: visible !important;
+    }
+
+    .modal-backdrop {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: auto !important;
+      background: none !important;
+      backdrop-filter: none !important;
+      padding: 0.5cm !important;
+      display: block !important;
+      z-index: 10000 !important;
+    }
+
+    .modal-content-container {
+      margin: 0 auto !important;
+      max-width: 100% !important;
+      width: auto !important;
+    }
+
+    .sticker-card {
+      border: 2px dashed #000000 !important;
+      box-shadow: none !important;
+      max-width: 340px !important;
+      margin: 0 auto !important;
+      page-break-inside: avoid;
+    }
+
+    .no-print {
+      display: none !important;
+      visibility: hidden !important;
+    }
+  }
 </style>
