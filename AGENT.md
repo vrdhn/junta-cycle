@@ -48,8 +48,10 @@
 
 ## Current Status & Next Steps
 - Frontend created in `frontend/` with landing page (`frontend/src/App.svelte`).
-- Verified `./jctool build` successfully generates `frontend/dist`.
+- Implemented `./jctool publish`, deployed landing page directly to `gh-pages` branch and pushed `master`.
+- Live site URL: `https://vrdhn.github.io/junta-cycle/`.
 - Next: Wire up Supabase Auth to the Login button on the landing page.
+
 
 
 
