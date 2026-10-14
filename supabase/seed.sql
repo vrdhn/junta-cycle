@@ -23,6 +23,8 @@ declare
   park_tower_a uuid;
   park_clubhouse uuid;
   park_sector2 uuid;
+  rider_eshan uuid;
+  cycle_jc105 uuid;
 begin
   execute 'create extension if not exists pgcrypto with schema extensions';
   encrypted_pw := extensions.crypt(default_pw, extensions.gen_salt('bf'));
@@ -201,5 +203,20 @@ begin
     color = excluded.color,
     model_number = excluded.model_number,
     status = excluded.status;
+
+  -- Assign Home Parkings and Phone Numbers to profiles
+  update public.profiles set home_parking_id = park_tower_a, phone_number = '+91 98765 43210' where email in ('bhavna@junta.cycle', 'eshan@junta.cycle', 'fatima@junta.cycle');
+  update public.profiles set home_parking_id = park_clubhouse, phone_number = '+91 98765 43211' where email in ('chirag@junta.cycle', 'gopal@junta.cycle', 'hema@junta.cycle');
+  update public.profiles set home_parking_id = park_sector2, phone_number = '+91 98765 43212' where email in ('divya@junta.cycle', 'ishan@junta.cycle', 'jaya@junta.cycle');
+
+  -- Seed a sample active checkout for Eshan (JC-105 from Tower A)
+  select id into rider_eshan from public.profiles where email = 'eshan@junta.cycle';
+  select id into cycle_jc105 from public.cycles where cycle_number = 'JC-105';
+
+  if rider_eshan is not null and cycle_jc105 is not null then
+    insert into public.checkouts (cycle_id, rider_id, home_parking_id, checked_out_at, status)
+    values (cycle_jc105, rider_eshan, park_tower_a, now() - interval '45 minutes', 'active')
+    on conflict do nothing;
+  end if;
 
 end $$;

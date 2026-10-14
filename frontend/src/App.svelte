@@ -8,6 +8,7 @@
   let currentRoute = $state<"home" | "debug" | "app">("home");
   let activeUser = $state<any>(null);
   let sessionLoaded = $state(false);
+  let scanUuid = $state<string | undefined>(undefined);
 
   function checkRoute() {
     const rawPath = window.location.pathname.replace(/\/+$/, "");
@@ -15,6 +16,13 @@
     const search = window.location.search;
 
     let target: "home" | "debug" | "app" = "home";
+
+    // Detect scan UUID in path (/scan/<uuid>), hash (#scan/<uuid>), or query (?scan=<uuid>)
+    const scanMatch = window.location.href.match(/scan[\/=]([0-9a-fA-F-]{36})/i);
+    if (scanMatch) {
+      scanUuid = scanMatch[1];
+      target = "app";
+    }
 
     // Hash overrides path if explicitly set
     if (hash === "#app" || hash === "#/app" || search.includes("app")) {
@@ -32,7 +40,7 @@
       target = "app";
     } else if (rawPath.endsWith("/debug") || rawPath.endsWith("/users")) {
       target = "debug";
-    } else {
+    } else if (!scanMatch) {
       target = "home";
     }
 
@@ -99,7 +107,7 @@
 {#if currentRoute === "debug"}
   <DebugPage onNavigate={navigateTo} />
 {:else if currentRoute === "app" && activeUser}
-  <AppScreen user={activeUser} onNavigate={navigateTo} onLogout={handleLogout} />
+  <AppScreen user={activeUser} onNavigate={navigateTo} onLogout={handleLogout} {scanUuid} />
 {:else}
   <main class="welcome-container">
     <div class="hero-card">

@@ -3,14 +3,16 @@
   import { supabase } from "./supabase";
   import LocationsAdmin from "./LocationsAdmin.svelte";
   import ManagerCyclesView from "./ManagerCyclesView.svelte";
+  import RiderDashboard from "./RiderDashboard.svelte";
 
   interface Props {
     user: any;
     onNavigate: (route: "home" | "debug" | "app") => void;
     onLogout: () => Promise<void>;
+    scanUuid?: string;
   }
 
-  let { user, onNavigate, onLogout }: Props = $props();
+  let { user, onNavigate, onLogout, scanUuid }: Props = $props();
 
   interface UserProfile {
     id: string;
@@ -23,12 +25,6 @@
   let loadingProfile = $state(true);
   let errorMsg = $state<string | null>(null);
   let selectedRole = $state<string>("rider");
-
-  // Rider state demo
-  let bikeCode = $state("");
-  let unlockedBike = $state<{ id: string; lockCode: string } | null>(null);
-  let rideActive = $state(false);
-  let rideStart = $state<Date | null>(null);
 
   async function loadProfile() {
     if (!user) return;
@@ -54,20 +50,6 @@
     } finally {
       loadingProfile = false;
     }
-  }
-
-  function handleUnlock() {
-    if (!bikeCode.trim()) return;
-    const dummyCode = String(Math.floor(1000 + Math.random() * 9000));
-    unlockedBike = { id: bikeCode.trim().toUpperCase(), lockCode: dummyCode };
-    rideActive = true;
-    rideStart = new Date();
-  }
-
-  function handleEndRide() {
-    rideActive = false;
-    unlockedBike = null;
-    bikeCode = "";
   }
 
   onMount(() => {
@@ -131,61 +113,7 @@
     <div class="tab-content">
       {#if selectedRole === "rider"}
         <div class="role-view">
-          <div class="card">
-            <h2>🚴 Rider Dashboard</h2>
-            <p class="card-desc">Scan a bike's QR code or enter its Bike ID to unlock physical combination lock.</p>
-
-            {#if !rideActive}
-              <div class="unlock-form">
-                <label for="bike-input">Bike Identifier / QR ID</label>
-                <div class="input-row">
-                  <input
-                    id="bike-input"
-                    type="text"
-                    placeholder="e.g. JC-104"
-                    bind:value={bikeCode}
-                  />
-                  <button class="btn-primary" onclick={handleUnlock} disabled={!bikeCode.trim()}>
-                    Unlock Bike
-                  </button>
-                </div>
-              </div>
-            {:else}
-              <div class="active-ride-box">
-                <div class="ride-header">
-                  <span class="badge-active">Ride in Progress</span>
-                  <h3>Bike: {unlockedBike?.id}</h3>
-                </div>
-                <div class="lock-code-banner">
-                  <span class="lock-label">Physical Lock Combination:</span>
-                  <span class="lock-number">{unlockedBike?.lockCode}</span>
-                  <p class="lock-hint">Rotate dials on the physical combination lock to this 4-digit code.</p>
-                </div>
-                <button class="btn-danger" onclick={handleEndRide}>
-                  End Ride &amp; Lock Bike
-                </button>
-              </div>
-            {/if}
-          </div>
-
-          <div class="grid-two">
-            <div class="card">
-              <h3>Station Stand Locations</h3>
-              <ul class="info-list">
-                <li><strong>Station 1:</strong> Main Gate (8 bikes available)</li>
-                <li><strong>Station 2:</strong> Library Plaza (5 bikes available)</li>
-                <li><strong>Station 3:</strong> Sports Complex (3 bikes available)</li>
-              </ul>
-            </div>
-            <div class="card">
-              <h3>Rider Guidelines</h3>
-              <ul class="info-list">
-                <li>Always scramble the combination dials after locking.</li>
-                <li>Report damaged brakes or chains immediately.</li>
-                <li>Return cycles only to designated yellow rack stands.</li>
-              </ul>
-            </div>
-          </div>
+          <RiderDashboard userId={user.id} userEmail={user.email} initialCycleIdOrUuid={scanUuid} />
         </div>
 
       {:else if selectedRole === "manager"}
@@ -428,36 +356,7 @@
     margin-bottom: 1.25rem;
   }
 
-  .unlock-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    max-width: 440px;
-  }
 
-  .unlock-form label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-main);
-  }
-
-  .input-row {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .input-row input {
-    flex: 1;
-    padding: 0.65rem 0.85rem;
-    border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
-    font-size: 1rem;
-  }
-
-  .input-row input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-  }
 
   .btn-primary {
     background: var(--primary-color);
@@ -480,78 +379,7 @@
     cursor: not-allowed;
   }
 
-  .btn-danger {
-    background: #ef4444;
-    color: white;
-    border: none;
-    padding: 0.65rem 1.25rem;
-    border-radius: 0.5rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.15s;
-    width: 100%;
-    max-width: 280px;
-  }
 
-  .btn-danger:hover {
-    background: #dc2626;
-  }
-
-  .active-ride-box {
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 0.75rem;
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .ride-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .badge-active {
-    background: #10b981;
-    color: white;
-    padding: 0.2rem 0.6rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-
-  .lock-code-banner {
-    background: white;
-    border: 1px dashed #10b981;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    text-align: center;
-  }
-
-  .lock-label {
-    display: block;
-    font-size: 0.85rem;
-    color: #166534;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  .lock-number {
-    display: block;
-    font-size: 2.25rem;
-    font-weight: 800;
-    letter-spacing: 0.25em;
-    color: #14532d;
-    font-family: monospace;
-  }
-
-  .lock-hint {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-top: 0.25rem;
-  }
 
   .grid-two {
     display: grid;
