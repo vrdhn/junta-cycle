@@ -2,15 +2,19 @@
   import { onMount } from "svelte";
   import StatusBar from "./lib/StatusBar.svelte";
   import DebugPage from "./lib/DebugPage.svelte";
+  import AppScreen from "./lib/AppScreen.svelte";
   import { supabase } from "./lib/supabase";
 
-  let currentRoute = $state<"home" | "debug">("home");
+  let currentRoute = $state<"home" | "debug" | "app">("home");
   let activeUser = $state<any>(null);
+  let sessionLoaded = $state(false);
 
   function checkRoute() {
     const path = window.location.pathname.replace(/\/+$/, "");
     const hash = window.location.hash;
     const search = window.location.search;
+
+    let target: "home" | "debug" | "app" = "home";
 
     if (
       path.endsWith("/debug") ||
@@ -22,19 +26,40 @@
       search.includes("debug") ||
       search.includes("users")
     ) {
-      currentRoute = "debug";
+      target = "debug";
+    } else if (
+      path.endsWith("/app") ||
+      hash === "#app" ||
+      hash === "#/app" ||
+      search.includes("app")
+    ) {
+      target = "app";
     } else {
-      currentRoute = "home";
+      target = "home";
     }
+
+    // Redirect anonymous users from /app to /
+    if (target === "app" && sessionLoaded && !activeUser) {
+      navigateTo("home");
+      return;
+    }
+
+    currentRoute = target;
   }
 
-  function navigateTo(route: "home" | "debug") {
+  function navigateTo(route: "home" | "debug" | "app") {
     if (route === "debug") {
       window.location.hash = "debug";
+    } else if (route === "app") {
+      window.location.hash = "app";
     } else {
       window.location.hash = "";
-      if (window.location.pathname.endsWith("/debug") || window.location.pathname.endsWith("/users")) {
-        window.history.pushState({}, "", window.location.pathname.replace(/\/(?:debug|users)$/, "/") || "./");
+      if (
+        window.location.pathname.endsWith("/debug") ||
+        window.location.pathname.endsWith("/users") ||
+        window.location.pathname.endsWith("/app")
+      ) {
+        window.history.pushState({}, "", window.location.pathname.replace(/\/(?:debug|users|app)$/, "/") || "./");
       }
     }
     checkRoute();
@@ -43,15 +68,17 @@
   async function checkSession() {
     const { data } = await supabase.auth.getSession();
     activeUser = data?.session?.user ?? null;
+    sessionLoaded = true;
+    checkRoute();
   }
 
   async function handleLogout() {
     await supabase.auth.signOut();
     activeUser = null;
+    navigateTo("home");
   }
 
   onMount(() => {
-    checkRoute();
     checkSession();
 
     window.addEventListener("popstate", checkRoute);
@@ -59,6 +86,8 @@
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       activeUser = session?.user ?? null;
+      sessionLoaded = true;
+      checkRoute();
     });
 
     return () => {
@@ -73,6 +102,8 @@
 
 {#if currentRoute === "debug"}
   <DebugPage />
+{:else if currentRoute === "app" && activeUser}
+  <AppScreen user={activeUser} onNavigate={navigateTo} onLogout={handleLogout} />
 {:else}
   <main class="welcome-container">
     <div class="hero-card">
@@ -94,9 +125,12 @@
       <div class="action-section">
         {#if !activeUser}
           <button class="btn-primary" onclick={() => navigateTo("debug")}>
-            Login / Debug Users
+            Login / Select User
           </button>
         {:else}
+          <button class="btn-primary" onclick={() => navigateTo("app")}>
+            Open App (/app) ➔
+          </button>
           <button class="btn-secondary" onclick={() => navigateTo("debug")}>
             Switch User (/debug)
           </button>

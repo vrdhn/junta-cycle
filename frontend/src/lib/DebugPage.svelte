@@ -80,7 +80,10 @@
         errorMsg = `Login failed for ${user.email}: ${error.message}`;
       } else {
         activeUserEmail = data?.user?.email ?? user.email;
-        successMsg = `Logged in as ${user.full_name || user.email}`;
+        successMsg = `Logged in as ${user.full_name || user.email}. Redirecting to /app...`;
+        setTimeout(() => {
+          window.location.hash = "app";
+        }, 400);
       }
     } catch (e: any) {
       errorMsg = `Error logging in: ${e.message || e}`;
@@ -116,6 +119,9 @@
 
   <div class="header-nav">
     <a href="./" class="nav-back">← Back to Home</a>
+    {#if activeUserEmail}
+      <a href="#app" class="nav-app">Go to /app ➔</a>
+    {/if}
     <span class="badge-secret">/debug</span>
   </div>
 
@@ -130,7 +136,10 @@
       {/if}
     </div>
     {#if activeUserEmail}
-      <button class="btn-logout" onclick={logout}>Log Out</button>
+      <div class="session-actions">
+        <a href="#app" class="btn-app-action">Open /app ➔</a>
+        <button class="btn-logout" onclick={logout}>Log Out</button>
+      </div>
     {/if}
   </div>
 
@@ -265,6 +274,46 @@
   .nav-back:hover {
     background-color: #f0fdfa;
     text-decoration: none;
+  }
+
+  .nav-app {
+    display: inline-flex;
+    align-items: center;
+    color: #047857;
+    background-color: #d1fae5;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.15s;
+  }
+
+  .nav-app:hover {
+    background-color: #a7f3d0;
+  }
+
+  .session-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .btn-app-action {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--primary-color);
+    color: white;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.35rem 0.85rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.15s;
+  }
+
+  .btn-app-action:hover {
+    background-color: var(--primary-hover);
   }
 
   .badge-secret {
