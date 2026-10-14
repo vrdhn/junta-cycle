@@ -26,7 +26,7 @@ NODE_BIN_DIR = NODE_DIR / "bin"
 NODE_VERSION = "v22.11.0"
 
 CONFIG_FILE = Path("config.json")
-MIGRATIONS_DIR = Path("backend/migrations")
+MIGRATIONS_DIR = Path("supabase/migrations")
 ENC_PREFIX = "enc-v1:"
 
 ENC_PATTERN = re.compile(r"^enc-v\d+:")
@@ -556,103 +556,26 @@ def cmd_db_query(passphrase: str = "") -> None:
         sys.exit(res.returncode)
 
 
-def split_sql_statements(sql: str) -> list[str]:
-    """Split a SQL script using explicit '-- statement' or '-- ---' comment markers."""
-    chunks = re.split(r"(?m)^--\s*(?:statement|---)\s*$", sql)
-    return [c.strip() for c in chunks if c.strip()]
-
-
-
-def ensure_migrations_table(sb_exe: Path, db_url: str) -> None:
-    """Ensure the schema_migrations tracking table exists in Supabase."""
-    ddl = "create table if not exists public.schema_migrations (version text primary key, applied_at timestamptz default now());"
-    temp = Path(f"/tmp/jc_m_{os.getpid()}.sql")
-    try:
-        temp.write_text(ddl, encoding="utf-8")
-        subprocess.run([str(sb_exe), "db", "query", "--db-url", db_url, "-f", str(temp)], capture_output=True, check=True)
-    finally:
-        if temp.is_file():
-            temp.unlink()
-
-
-def get_applied_migrations(sb_exe: Path, db_url: str) -> set[str]:
-    """Retrieve set of applied migration versions from schema_migrations."""
-    ensure_migrations_table(sb_exe, db_url)
-    res = subprocess.run(
-        [str(sb_exe), "db", "query", "--db-url", db_url, "--output-format", "json", "select version from public.schema_migrations;"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if res.returncode != 0:
-        return set()
-    try:
-        data = json.loads(res.stdout)
-        return {row["version"] for row in data if "version" in row}
-    except Exception:
-        return set()
-
-
-def apply_migration_file(sb_exe: Path, db_url: str, file_path: Path) -> None:
-    """Apply a single migration file and record it in schema_migrations."""
-    statements = split_sql_statements(file_path.read_text(encoding="utf-8"))
-    temp_stmt = Path(f"/tmp/jc_stmt_{os.getpid()}.sql")
-    try:
-        for idx, stmt in enumerate(statements, 1):
-            temp_stmt.write_text(stmt, encoding="utf-8")
-            res = subprocess.run([str(sb_exe), "db", "query", "--db-url", db_url, "-f", str(temp_stmt)], capture_output=True, text=True, check=False)
-            if res.returncode != 0:
-                print_err(f"Failed in {file_path.name} at statement [{idx}/{len(statements)}]:\n{stmt[:100]}...")
-                print(res.stderr.strip())
-                sys.exit(res.returncode)
-
-        rec_sql = f"insert into public.schema_migrations (version) values ('{file_path.name}') on conflict (version) do nothing;"
-        temp_stmt.write_text(rec_sql, encoding="utf-8")
-        subprocess.run([str(sb_exe), "db", "query", "--db-url", db_url, "-f", str(temp_stmt)], capture_output=True, check=True)
-    finally:
-        if temp_stmt.is_file():
-            temp_stmt.unlink()
-
-
 def cmd_db_migrate(passphrase: str = "") -> None:
-    """Apply all pending migration files from backend/migrations to Supabase."""
+    """Apply pending migrations to Supabase transactionally using Supabase CLI."""
     ensure_cached_path()
     sb_exe = BIN_DIR / "supabase"
     if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
         print_err("Supabase CLI not found. Run './jctool install' first.")
         sys.exit(1)
 
-    if not MIGRATIONS_DIR.is_dir():
-        print_err(f"Migrations directory not found at {MIGRATIONS_DIR}")
-        sys.exit(1)
-
-    migration_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
-    if not migration_files:
-        print_warn(f"No migration files found in {MIGRATIONS_DIR}")
-        return
-
     db_url = get_db_url(passphrase)
-    applied = get_applied_migrations(sb_exe, db_url)
-    pending = [f for f in migration_files if f.name not in applied]
-
-    if not pending:
-        print_ok("Database is up to date (no pending migrations).")
-        return
-
-    print(f"Found {len(pending)} pending migration(s):")
-    for f in pending:
-        print(f"  - {f.name}")
-
-    for f in pending:
-        print(f"Applying migration: {f.name}...")
-        apply_migration_file(sb_exe, db_url, f)
-        print_ok(f"Applied: {f.name}")
-
-    print_ok("All migrations completed successfully!")
+    print_header("Applying Supabase Migrations (Transactional)")
+    cmd = [str(sb_exe), "db", "push", "--include-all", "--db-url", db_url]
+    res = subprocess.run(cmd, check=False)
+    if res.returncode != 0:
+        print_err("Database migration failed.")
+        sys.exit(res.returncode)
+    print_ok("Database migrations pushed successfully!")
 
 
 def cmd_db_status(passphrase: str = "") -> None:
-    """Show applied and pending status of all migration files."""
+    """Show migration status (local vs remote) using Supabase CLI."""
     ensure_cached_path()
     sb_exe = BIN_DIR / "supabase"
     if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
@@ -660,19 +583,26 @@ def cmd_db_status(passphrase: str = "") -> None:
         sys.exit(1)
 
     db_url = get_db_url(passphrase)
-    applied = get_applied_migrations(sb_exe, db_url)
-    files = sorted(MIGRATIONS_DIR.glob("*.sql")) if MIGRATIONS_DIR.is_dir() else []
+    print_header("Supabase Migration Status")
+    cmd = [str(sb_exe), "migration", "list", "--db-url", db_url]
+    res = subprocess.run(cmd, check=False)
+    if res.returncode != 0:
+        sys.exit(res.returncode)
 
-    print_header("junta-cycle database migrations")
-    if not files:
-        print("No migration files found in backend/migrations/")
-        return
 
-    for f in files:
-        if f.name in applied:
-            print_ok(f"{f.name} [APPLIED]")
-        else:
-            print_warn(f"{f.name} [PENDING]")
+def cmd_db_new() -> None:
+    """Create a new migration script in supabase/migrations/."""
+    ensure_cached_path()
+    sb_exe = BIN_DIR / "supabase"
+    if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
+        print_err("Supabase CLI not found. Run './jctool install' first.")
+        sys.exit(1)
+
+    name = sys.argv[2] if len(sys.argv) > 2 else "migration"
+    cmd = [str(sb_exe), "migration", "new", name]
+    res = subprocess.run(cmd, check=False)
+    if res.returncode != 0:
+        sys.exit(res.returncode)
 
 
 def cmd_publish() -> None:
@@ -699,8 +629,9 @@ def show_help() -> None:
     print("  build       Build the frontend app into frontend/dist")
     print("  dev         Start local development server for frontend")
     print("  publish     Publish project (runs db-migrate first, then deploys to gh-pages)")
-    print("  db-migrate  Apply pending migrations from backend/migrations/ to Supabase")
-    print("  db-status   Show status of database migrations (applied vs pending)")
+    print("  db-migrate  Apply pending migrations to Supabase (transactional via Supabase CLI)")
+    print("  db-status   Show status of database migrations (local vs remote)")
+    print("  db-new      Create a new timestamped migration file in supabase/migrations/")
     print("  db-query    Run query or SQL file (e.g. ./jctool db-query 'SELECT 1;' or -f file.sql)")
     print("  help        Show this help message")
 
@@ -716,6 +647,7 @@ def main() -> None:
         "publish": cmd_publish,
         "db-migrate": cmd_db_migrate,
         "db-status": cmd_db_status,
+        "db-new": cmd_db_new,
         "db-query": cmd_db_query,
         "help": show_help,
         "--help": show_help,
