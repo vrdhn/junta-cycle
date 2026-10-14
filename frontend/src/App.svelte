@@ -83,7 +83,10 @@
       {#if activeUser}
         <div class="user-status-box">
           <span class="user-greeting">Logged in as</span>
-          <strong class="user-email">{activeUser.email}</strong>
+          <strong class="user-email">{activeUser.user_metadata?.full_name || activeUser.email}</strong>
+          {#if activeUser.user_metadata?.full_name}
+            <span class="user-subemail">{activeUser.email}</span>
+          {/if}
           <button class="btn-logout" onclick={handleLogout}>Log Out</button>
         </div>
       {/if}
@@ -163,6 +166,13 @@
   .user-email {
     font-size: 1rem;
     color: #14532d;
+    word-break: break-all;
+  }
+
+  .user-subemail {
+    font-size: 0.8rem;
+    color: #166534;
+    opacity: 0.85;
     word-break: break-all;
   }
 
