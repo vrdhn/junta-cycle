@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { supabase } from "./supabase";
   import LocationsAdmin from "./LocationsAdmin.svelte";
+  import ManagerCyclesView from "./ManagerCyclesView.svelte";
 
   interface Props {
     user: any;
@@ -189,63 +190,7 @@
 
       {:else if selectedRole === "manager"}
         <div class="role-view">
-          <div class="card">
-            <h2>🛠️ Fleet Manager Dashboard</h2>
-            <p class="card-desc">Monitor cycle availability, station balancing, and physical lock health.</p>
-
-            <div class="stats-grid">
-              <div class="stat-card">
-                <span class="stat-num">42</span>
-                <span class="stat-label">Total Cycles</span>
-              </div>
-              <div class="stat-card stat-green">
-                <span class="stat-num">31</span>
-                <span class="stat-label">Available</span>
-              </div>
-              <div class="stat-card stat-blue">
-                <span class="stat-num">9</span>
-                <span class="stat-label">Active Rides</span>
-              </div>
-              <div class="stat-card stat-amber">
-                <span class="stat-num">2</span>
-                <span class="stat-label">Needs Maintenance</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>Station Capacity &amp; Rebalancing</h3>
-            <table class="simple-table">
-              <thead>
-                <tr>
-                  <th>Station</th>
-                  <th>Bikes Present</th>
-                  <th>Capacity</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Main Gate (Station 1)</td>
-                  <td>14</td>
-                  <td>15</td>
-                  <td><span class="badge-status status-good">Balanced</span></td>
-                </tr>
-                <tr>
-                  <td>Library Plaza (Station 2)</td>
-                  <td>4</td>
-                  <td>15</td>
-                  <td><span class="badge-status status-warn">Low Inventory</span></td>
-                </tr>
-                <tr>
-                  <td>Hostel Cluster (Station 3)</td>
-                  <td>13</td>
-                  <td>15</td>
-                  <td><span class="badge-status status-good">Balanced</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <ManagerCyclesView userId={user.id} />
         </div>
 
       {:else if selectedRole === "superuser"}
@@ -648,47 +593,6 @@
     font-size: 0.8rem;
     color: var(--text-muted);
     font-weight: 600;
-  }
-
-  .stat-green .stat-num { color: #15803d; }
-  .stat-blue .stat-num { color: #0369a1; }
-  .stat-amber .stat-num { color: #b45309; }
-
-  .simple-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
-  }
-
-  .simple-table th, .simple-table td {
-    padding: 0.75rem 0.85rem;
-    border-bottom: 1px solid var(--border-color);
-    text-align: left;
-  }
-
-  .simple-table th {
-    background: #f8fafc;
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    font-weight: 700;
-  }
-
-  .badge-status {
-    padding: 0.2rem 0.55rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  .status-good {
-    background: #dcfce7;
-    color: #15803d;
-  }
-
-  .status-warn {
-    background: #fef3c7;
-    color: #92400e;
   }
 
   .loading-card, .error-card {

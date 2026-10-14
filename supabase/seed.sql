@@ -20,6 +20,9 @@ declare
   mgr_bhavna uuid;
   mgr_chirag uuid;
   mgr_divya uuid;
+  park_tower_a uuid;
+  park_clubhouse uuid;
+  park_sector2 uuid;
 begin
   execute 'create extension if not exists pgcrypto with schema extensions';
   encrypted_pw := extensions.crypt(default_pw, extensions.gen_salt('bf'));
@@ -152,15 +155,18 @@ begin
   -- Seed Private Parkings (Belongs to Society with Assigned Manager)
   insert into public.parkings (place_id, name, parking_type, manager_id, capacity)
   values (soc1_id, 'Tower A Cycle Rack', 'private', mgr_bhavna, 12)
-  on conflict (place_id, name) do update set capacity = excluded.capacity, manager_id = excluded.manager_id;
+  on conflict (place_id, name) do update set capacity = excluded.capacity, manager_id = excluded.manager_id
+  returning id into park_tower_a;
 
   insert into public.parkings (place_id, name, parking_type, manager_id, capacity)
   values (soc2_id, 'Clubhouse Stand', 'private', mgr_chirag, 8)
-  on conflict (place_id, name) do update set capacity = excluded.capacity, manager_id = excluded.manager_id;
+  on conflict (place_id, name) do update set capacity = excluded.capacity, manager_id = excluded.manager_id
+  returning id into park_clubhouse;
 
   insert into public.parkings (place_id, name, parking_type, manager_id, capacity)
   values (soc3_id, 'Sector 2 Basement Rack', 'private', mgr_divya, 15)
-  on conflict (place_id, name) do update set capacity = excluded.capacity, manager_id = excluded.manager_id;
+  on conflict (place_id, name) do update set capacity = excluded.capacity, manager_id = excluded.manager_id
+  returning id into park_sector2;
 
   -- Seed Public Parkings (Belongs to Landmark)
   insert into public.parkings (place_id, name, parking_type, capacity)
@@ -170,5 +176,28 @@ begin
   insert into public.parkings (place_id, name, parking_type, capacity)
   values (lm2_id, 'Sony World Footpath Stand', 'public', 10)
   on conflict (place_id, name) do update set capacity = excluded.capacity;
+
+  -- Seed Cycles for Private Parking Stands (Tower A: Bhavna, Clubhouse: Chirag, Sector 2: Divya)
+  insert into public.cycles (cycle_number, parking_id, company_name, color, model_number, status) values
+    ('JC-101', park_tower_a, 'Hero Cycles', 'Matte Black', 'Sprint Pro 27.5', 'running'),
+    ('JC-102', park_tower_a, 'Hercules', 'Neon Blue', 'Roadeo Hardtail', 'running'),
+    ('JC-103', park_tower_a, 'Decathlon Btwin', 'Flame Orange', 'Rockrider ST30', 'puncture'),
+    ('JC-104', park_tower_a, 'Firefox', 'Pearl White', 'Target 29 D', 'broken'),
+    ('JC-105', park_tower_a, 'Trek', 'Forest Green', 'Marlin 4 Gen 2', 'running'),
+
+    ('JC-201', park_clubhouse, 'Hero Lectro', 'Metallic Silver', 'C6 E-Cycle', 'running'),
+    ('JC-202', park_clubhouse, 'Hercules', 'Royal Red', 'Street Cat Pro', 'running'),
+    ('JC-203', park_clubhouse, 'Decathlon Btwin', 'Dark Grey', 'Riverside 120', 'running'),
+    ('JC-204', park_clubhouse, 'Firefox', 'Electric Yellow', 'Sniper 21S', 'puncture'),
+
+    ('JC-301', park_sector2, 'Hero Cycles', 'Sky Blue', 'Sprint Next D', 'running'),
+    ('JC-302', park_sector2, 'Hercules', 'Matte Green', 'Storm City Commute', 'running'),
+    ('JC-303', park_sector2, 'Decathlon Btwin', 'Crimson Red', 'MyBike 700 V2', 'broken')
+  on conflict (cycle_number) do update set
+    parking_id = excluded.parking_id,
+    company_name = excluded.company_name,
+    color = excluded.color,
+    model_number = excluded.model_number,
+    status = excluded.status;
 
 end $$;
