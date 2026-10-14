@@ -1,0 +1,8 @@
+{
+  "secrets": {
+    "supabase": {
+      "url": "",
+      "anon_key": ""
+    }
+  }
+}

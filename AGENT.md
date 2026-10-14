@@ -27,10 +27,20 @@
 ## Tools & Workflows
 - **`./jctool`**: Project management script in Python (standard library only, zero external dependencies).
   - `./jctool install`: Installs Node.js & npm into `~/.cache/junta-cycle/nodejs` (isolated, non-system).
-  - `./jctool check`: Verifies Node/npm runtime in cache, Git/GitHub credentials, and Supabase keys.
+  - `./jctool check`: Verifies Node/npm runtime in cache, Git/GitHub credentials, and Supabase keys in `config.json`.
+  - `./jctool encrypt`: Encrypts plaintext strings under `"secrets"` in `config.json` with prefix `enc-v1:` using OpenSSL AES-256-CBC PBKDF2.
+  - `./jctool decrypt`: Decrypts `enc-v1:` strings in `config.json` using console-prompted passphrase.
+
+## Configuration & Secrets Management
+- File: `config.json`
+- Top-level `"secrets"` object contains sensitive service configurations (e.g. `"supabase"`: `url`, `anon_key`).
+- Encryption scheme: OpenSSL AES-256-CBC, PBKDF2 with 100,000 iterations and salt.
+- Encrypted format: `enc-v1:<base64-ciphertext>`
+- Passphrase is asked interactively from the console (hidden input via `getpass`).
 
 ## Current Status & Next Steps
-- Node.js (v22.11.0) and npm (10.9.0) successfully installed in `~/.cache/junta-cycle/nodejs`.
-- `./jctool check` runs cleanly and reports status.
-- Next: Supabase credentials configuration and project scaffolding.
+- Node.js (v22.11.0) and npm (10.9.0) managed in `~/.cache/junta-cycle/nodejs`.
+- Converted `jctool` to Python stdlib; tested `install`, `check`, `encrypt`, and `decrypt`.
+- Initial `config.json` template created.
+
 

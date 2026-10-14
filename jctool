@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """junta-cycle project management tool (jctool).
 
-Uses only Python standard library.
+Uses only Python standard library + standard openssl CLI for encryption.
 """
 
+import getpass
 import json
 import os
 import platform
@@ -13,11 +14,14 @@ import sys
 import tarfile
 import urllib.request
 from pathlib import Path
+from typing import Any, Callable
 
 CACHE_DIR = Path.home() / ".cache" / "junta-cycle"
 NODE_DIR = CACHE_DIR / "nodejs"
 NODE_BIN_DIR = NODE_DIR / "bin"
 NODE_VERSION = "v22.11.0"
+CONFIG_FILE = Path("config.json")
+ENC_PREFIX = "enc-v1:"
 
 # ANSI Colors
 GREEN = "\033[0;32m"
@@ -46,10 +50,10 @@ def print_err(message: str) -> None:
 def ensure_cached_path() -> None:
     """Prepend cached nodejs bin to PATH if it exists."""
     if NODE_BIN_DIR.is_dir():
-        current_path = os.environ.get("PATH", "")
-        node_bin_str = str(NODE_BIN_DIR)
-        if node_bin_str not in current_path.split(os.pathsep):
-            os.environ["PATH"] = f"{node_bin_str}{os.pathsep}{current_path}"
+        cur = os.environ.get("PATH", "")
+        node_bin = str(NODE_BIN_DIR)
+        if node_bin not in cur.split(os.pathsep):
+            os.environ["PATH"] = f"{node_bin}{os.pathsep}{cur}"
 
 
 def run_command(cmd: list[str]) -> tuple[int, str]:
@@ -59,6 +63,130 @@ def run_command(cmd: list[str]) -> tuple[int, str]:
         return res.returncode, res.stdout.strip()
     except FileNotFoundError:
         return 127, ""
+
+
+def openssl_cipher(args: list[str], input_str: str, passphrase: str) -> str:
+    """Run openssl enc with passphrase passed via environment."""
+    env = os.environ.copy()
+    env["JC_CIPHER_PASS"] = passphrase
+    cmd = ["openssl", "enc", *args, "-pass", "env:JC_CIPHER_PASS"]
+    res = subprocess.run(
+        cmd,
+        input=input_str,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    if res.returncode != 0:
+        err = res.stderr.strip()
+        raise ValueError(f"OpenSSL failed: {err}")
+    return res.stdout.strip()
+
+
+def encrypt_value(value: str, passphrase: str) -> str:
+    """Encrypt a string if not already encrypted."""
+    if value.startswith(ENC_PREFIX) or not value:
+        return value
+    args = ["-aes-256-cbc", "-pbkdf2", "-iter", "100000", "-salt", "-a", "-A"]
+    cipher_b64 = openssl_cipher(args, value, passphrase)
+    return f"{ENC_PREFIX}{cipher_b64}"
+
+
+def decrypt_value(value: str, passphrase: str) -> str:
+    """Decrypt a string if it starts with ENC_PREFIX."""
+    if not value.startswith(ENC_PREFIX):
+        return value
+    payload = value[len(ENC_PREFIX) :]
+    args = ["-d", "-aes-256-cbc", "-pbkdf2", "-iter", "100000", "-salt", "-a", "-A"]
+    return openssl_cipher(args, payload, passphrase)
+
+
+def map_secrets(data: Any, fn: Callable[[str, str], str], passphrase: str) -> Any:
+    """Recursively transform string values in a secrets structure."""
+    if isinstance(data, dict):
+        return {k: map_secrets(v, fn, passphrase) for k, v in data.items()}
+    if isinstance(data, list):
+        return [map_secrets(item, fn, passphrase) for item in data]
+    if isinstance(data, str):
+        return fn(data, passphrase)
+    return data
+
+
+def load_config() -> dict[str, Any]:
+    """Load config.json or return default empty structure."""
+    if not CONFIG_FILE.is_file():
+        return {"secrets": {"supabase": {"url": "", "anon_key": ""}}}
+    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_config(data: dict[str, Any]) -> None:
+    """Save dictionary to config.json formatted with indents."""
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+
+
+def prompt_passphrase(prompt_text: str) -> str:
+    """Prompt for passphrase from env, interactive tty, or stdin."""
+    env_pass = os.environ.get("JC_PASSPHRASE")
+    if env_pass:
+        return env_pass
+    if sys.stdin.isatty():
+        return getpass.getpass(prompt_text)
+    print(prompt_text, end="", file=sys.stderr, flush=True)
+    return sys.stdin.readline().rstrip("\r\n")
+
+
+def cmd_encrypt() -> None:
+    """Encrypt all plaintext secrets in config.json."""
+    config = load_config()
+    if "secrets" not in config:
+        print_warn("No 'secrets' block found in config.json")
+        return
+
+    passphrase = prompt_passphrase("Enter encryption passphrase: ")
+    if not passphrase:
+        print_err("Passphrase cannot be empty")
+        sys.exit(1)
+
+    # Only confirm in interactive mode if not reading from env
+    if not os.environ.get("JC_PASSPHRASE") and sys.stdin.isatty():
+        confirm = getpass.getpass("Confirm encryption passphrase: ")
+        if passphrase != confirm:
+            print_err("Passphrases do not match")
+            sys.exit(1)
+
+    config["secrets"] = map_secrets(config["secrets"], encrypt_value, passphrase)
+    save_config(config)
+    print_ok(f"Encrypted secrets in {CONFIG_FILE}")
+
+
+def cmd_decrypt() -> None:
+    """Decrypt all encrypted secrets in config.json."""
+    if not CONFIG_FILE.is_file():
+        print_err(f"{CONFIG_FILE} does not exist")
+        sys.exit(1)
+
+    config = load_config()
+    if "secrets" not in config:
+        print_warn("No 'secrets' block found in config.json")
+        return
+
+    passphrase = prompt_passphrase("Enter decryption passphrase: ")
+    if not passphrase:
+        print_err("Passphrase cannot be empty")
+        sys.exit(1)
+
+    try:
+        config["secrets"] = map_secrets(config["secrets"], decrypt_value, passphrase)
+        save_config(config)
+        print_ok(f"Decrypted secrets in {CONFIG_FILE}")
+    except ValueError as err:
+        print_err(f"Decryption failed (incorrect passphrase or corrupted data): {err}")
+        sys.exit(1)
+
 
 
 def check_node() -> None:
@@ -101,34 +229,36 @@ def check_github() -> None:
 
 
 def check_supabase() -> None:
-    """Verify Supabase configuration in config.json or environment."""
+    """Verify Supabase configuration in config.json."""
     print("\nChecking Supabase configuration:")
-    config_file = Path("config.json")
-    sb_url = os.environ.get("SUPABASE_URL", "")
-    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    if not CONFIG_FILE.is_file():
+        print_warn(f"No {CONFIG_FILE} found")
+        print_err("Supabase URL missing (expected in config.json)")
+        print_err("Supabase Anon Key missing (expected in config.json)")
+        return
 
-    if config_file.is_file():
-        print_ok("Configuration file found: config.json")
-        try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            supabase_conf = data.get("secrets", {}).get("supabase", {})
-            sb_url = sb_url or supabase_conf.get("url", "")
-            sb_key = sb_key or supabase_conf.get("anon_key", "")
-        except (json.JSONDecodeError, OSError) as err:
-            print_warn(f"Failed to read config.json: {err}")
-    else:
-        print_warn("No config.json file found")
+    print_ok(f"Configuration file found: {CONFIG_FILE}")
+    try:
+        config = load_config()
+        sb = config.get("secrets", {}).get("supabase", {})
+        url = sb.get("url", "")
+        key = sb.get("anon_key", "")
 
-    if sb_url:
-        print_ok(f"Supabase URL detected: {sb_url}")
-    else:
-        print_err("Supabase URL missing (expected in config.json or SUPABASE_URL)")
+        if url:
+            enc_str = " (encrypted)" if url.startswith(ENC_PREFIX) else ""
+            print_ok(f"Supabase URL configured{enc_str}: {url}")
+        else:
+            print_err("Supabase URL missing in config.json (secrets.supabase.url)")
 
-    if sb_key:
-        print_ok("Supabase Anon Key detected")
-    else:
-        print_err("Supabase Anon Key missing (expected in config.json or SUPABASE_ANON_KEY)")
+        if key:
+            if key.startswith(ENC_PREFIX):
+                print_ok("Supabase Anon Key configured (encrypted)")
+            else:
+                print_warn("Supabase Anon Key is stored in PLAINTEXT (run './jctool encrypt')")
+        else:
+            print_err("Supabase Anon Key missing in config.json (secrets.supabase.anon_key)")
+    except Exception as err:
+        print_err(f"Error reading {CONFIG_FILE}: {err}")
 
 
 def cmd_install() -> None:
@@ -159,9 +289,7 @@ def cmd_install() -> None:
     NODE_DIR.mkdir(parents=True, exist_ok=True)
 
     with tarfile.open(tarball_path, "r:xz") as tar:
-        # Strip root directory when extracting
         members = tar.getmembers()
-        root_dir = members[0].name.split("/")[0] if members else ""
         for member in members:
             if "/" in member.name:
                 member.name = member.name.split("/", 1)[1]
@@ -195,6 +323,8 @@ def show_help() -> None:
     print("Commands:")
     print("  install  Install Node.js & npm into ~/.cache/junta-cycle")
     print("  check    Verify required tools and credentials (Node, Git/GitHub, Supabase)")
+    print("  encrypt  Encrypt plaintext secrets in config.json (prefixed with enc-v1:)")
+    print("  decrypt  Decrypt encrypted secrets in config.json")
     print("  help     Show this help message")
 
 
@@ -203,6 +333,8 @@ def main() -> None:
     commands = {
         "install": cmd_install,
         "check": cmd_check,
+        "encrypt": cmd_encrypt,
+        "decrypt": cmd_decrypt,
         "help": show_help,
         "--help": show_help,
         "-h": show_help,
