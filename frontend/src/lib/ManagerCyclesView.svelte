@@ -18,6 +18,14 @@
     city_name?: string;
   }
 
+  interface ActiveCheckout {
+    id: string;
+    checked_out_at: string;
+    rider_name: string;
+    rider_email: string;
+    rider_phone?: string;
+  }
+
   interface Cycle {
     id: string;
     parking_id: string;
@@ -29,6 +37,7 @@
     model_number: string;
     status: "running" | "broken" | "puncture" | "maintenance";
     created_at?: string;
+    active_checkout?: ActiveCheckout | null;
   }
 
   let managedStands = $state<ParkingStand[]>([]);
@@ -51,6 +60,25 @@
   let selectedCycleForQr = $state<Cycle | null>(null);
   let qrImageUrl = $state<string>("");
   let scanUrl = $state<string>("");
+
+  function formatCheckoutTime(iso: string): string {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+      const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      if (diffMins < 60) {
+        return `${timeStr} (${diffMins}m ago)`;
+      }
+      const diffHours = Math.floor(diffMins / 60);
+      const remMins = diffMins % 60;
+      return `${timeStr} (${diffHours}h ${remMins}m ago)`;
+    } catch {
+      return iso;
+    }
+  }
 
   async function loadStands() {
     loading = true;
@@ -108,14 +136,53 @@
   async function loadCycles(standId: string) {
     if (!standId) return;
     try {
-      const { data, error } = await supabase
+      // 1. Fetch cycles for this stand
+      const { data: cyclesData, error: cycErr } = await supabase
         .from("cycles")
         .select("*")
         .eq("parking_id", standId)
         .order("cycle_number");
 
-      if (error) throw error;
-      cycles = data || [];
+      if (cycErr) throw cycErr;
+
+      const cycleList: any[] = cyclesData || [];
+      const cycleIds = cycleList.map((c) => c.id);
+      const checkoutMap = new Map<string, ActiveCheckout>();
+
+      // 2. Fetch active checkouts for cycles at this stand
+      if (cycleIds.length > 0) {
+        const { data: checkoutsData, error: chkErr } = await supabase
+          .from("checkouts")
+          .select("id, cycle_id, rider_id, checked_out_at, status")
+          .in("cycle_id", cycleIds)
+          .eq("status", "active");
+
+        if (!chkErr && checkoutsData && checkoutsData.length > 0) {
+          const riderIds = Array.from(new Set(checkoutsData.map((chk: any) => chk.rider_id)));
+          const { data: profilesData } = await supabase
+            .from("profiles")
+            .select("id, full_name, email, phone_number")
+            .in("id", riderIds);
+
+          const profileMap = new Map((profilesData || []).map((p: any) => [p.id, p]));
+
+          for (const chk of checkoutsData) {
+            const profile = profileMap.get(chk.rider_id);
+            checkoutMap.set(chk.cycle_id, {
+              id: chk.id,
+              checked_out_at: chk.checked_out_at,
+              rider_name: profile?.full_name || profile?.email || "Unknown Rider",
+              rider_email: profile?.email || "",
+              rider_phone: profile?.phone_number || "",
+            });
+          }
+        }
+      }
+
+      cycles = cycleList.map((c) => ({
+        ...c,
+        active_checkout: checkoutMap.get(c.id) || null,
+      }));
     } catch (e: any) {
       errorMsg = `Failed to load cycles: ${e.message || e}`;
     }
@@ -281,16 +348,20 @@
   <!-- Stats Overview Bar -->
   <div class="stats-row">
     <div class="stat-pill stat-running">
-      <span class="stat-val">{cycles.filter((c) => c.status === "running").length}</span>
-      <span class="stat-lbl">Running / Available</span>
+      <span class="stat-val">{cycles.filter((c) => c.status === "running" && !c.active_checkout).length}</span>
+      <span class="stat-lbl">Available at Stand</span>
+    </div>
+    <div class="stat-pill stat-checked-out">
+      <span class="stat-val">{cycles.filter((c) => Boolean(c.active_checkout)).length}</span>
+      <span class="stat-lbl">Checked Out</span>
     </div>
     <div class="stat-pill stat-puncture">
       <span class="stat-val">{cycles.filter((c) => c.status === "puncture").length}</span>
       <span class="stat-lbl">Puncture</span>
     </div>
     <div class="stat-pill stat-broken">
-      <span class="stat-val">{cycles.filter((c) => c.status === "broken").length}</span>
-      <span class="stat-lbl">Broken</span>
+      <span class="stat-val">{cycles.filter((c) => c.status === "broken" || c.status === "maintenance").length}</span>
+      <span class="stat-lbl">Broken / Maint</span>
     </div>
     <div class="stat-pill stat-total">
       <span class="stat-val">{cycles.length}</span>
@@ -301,7 +372,7 @@
   <!-- Cycles Table -->
   <div class="card table-card">
     <div class="table-header">
-      <h3>Available Cycles at Stand ({cycles.length})</h3>
+      <h3>Cycles Assigned to Stand ({cycles.length})</h3>
       <button class="btn-refresh" onclick={() => loadCycles(selectedStandId)} title="Refresh list">↻ Refresh</button>
     </div>
 
@@ -320,13 +391,17 @@
               <th>Model Number</th>
               <th>Lock Code</th>
               <th>Status</th>
+              <th>Custody / Checked Out By</th>
               <th>QR Sticker</th>
               <th>Quick Status Update</th>
             </tr>
           </thead>
           <tbody>
             {#each cycles as cy}
-              <tr class:row-warning={cy.status === "broken" || cy.status === "puncture"}>
+              <tr
+                class:row-warning={cy.status === "broken" || cy.status === "puncture"}
+                class:row-checked-out={Boolean(cy.active_checkout)}
+              >
                 <td class="col-num">
                   <span class="cycle-tag">🚲 {cy.cycle_number}</span>
                 </td>
@@ -353,6 +428,22 @@
                       🟠 Maintenance
                     {/if}
                   </span>
+                </td>
+                <td class="col-custody">
+                  {#if cy.active_checkout}
+                    <div class="checkout-rider-box">
+                      <span class="badge-checked-out">⚡ Checked Out</span>
+                      <strong class="rider-name">{cy.active_checkout.rider_name}</strong>
+                      <span class="rider-meta">
+                        {cy.active_checkout.rider_email}{cy.active_checkout.rider_phone ? ` • ${cy.active_checkout.rider_phone}` : ''}
+                      </span>
+                      <span class="rider-time">🕐 {formatCheckoutTime(cy.active_checkout.checked_out_at)}</span>
+                    </div>
+                  {:else if cy.status === "running"}
+                    <span class="badge-available-stand">🟢 Available at Stand</span>
+                  {:else}
+                    <span class="text-in-rack">In Rack (Unavailable)</span>
+                  {/if}
                 </td>
                 <td>
                   <button class="btn-qr-action" onclick={() => openQrPopup(cy)} title="View printable QR Sticker">
@@ -616,6 +707,7 @@
   }
 
   .stat-running .stat-val { color: #16a34a; }
+  .stat-checked-out .stat-val { color: #2563eb; }
   .stat-puncture .stat-val { color: #d97706; }
   .stat-broken .stat-val { color: #dc2626; }
   .stat-total .stat-val { color: var(--text-main); }
@@ -682,6 +774,59 @@
 
   .row-warning {
     background-color: #fffbeb;
+  }
+
+  .row-checked-out {
+    background-color: #f0f7ff;
+  }
+
+  .col-custody {
+    min-width: 200px;
+  }
+
+  .checkout-rider-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .badge-checked-out {
+    display: inline-block;
+    align-self: flex-start;
+    background-color: rgba(37, 99, 235, 0.12);
+    color: #2563eb;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.725rem;
+    font-weight: 700;
+  }
+
+  .rider-name {
+    font-size: 0.875rem;
+    color: var(--text-main);
+  }
+
+  .rider-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .rider-time {
+    font-size: 0.75rem;
+    color: #2563eb;
+    font-weight: 600;
+  }
+
+  .badge-available-stand {
+    color: #16a34a;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .text-in-rack {
+    color: var(--text-muted);
+    font-size: 0.8rem;
   }
 
   .cycle-tag {
