@@ -81,10 +81,10 @@ drop policy if exists "Anyone can read allowed roles" on public.allowed_roles;
 create policy "Anyone can read allowed roles"
   on public.allowed_roles for select using (true);
 
+drop policy if exists "Profiles are viewable by everyone" on public.profiles;
 drop policy if exists "Users can read own profile or managers can read all" on public.profiles;
-create policy "Users can read own profile or managers can read all"
-  on public.profiles for select
-  using (auth.uid() = id or public.has_role('manager'));
+create policy "Profiles are viewable by everyone"
+  on public.profiles for select using (true);
 
 drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"

@@ -77,9 +77,10 @@
 
 ## Current Status & Next Steps
 - Created `supabase/seed.sql` and `./jctool db-demo` command.
-- Migrations ready to run via `./jctool db-migrate`.
-- Demo users ready to populate via `./jctool db-demo`.
-- Next: Wire up frontend 1-click login picker for demo users.
+- Created secret `/users` route (`frontend/src/lib/UsersTable.svelte`) displaying all users, roles badges, and 1-click login.
+- Configured SPA routing in `jctool build` (generating `404.html` and `users/index.html` for GitHub Pages).
+- Ready to apply migration using `./jctool db-migrate` and seed users with `./jctool db-demo`.
+- Next: Publish updated frontend using `./jctool publish`.
 
 
 

@@ -444,7 +444,15 @@ def cmd_build() -> None:
     print("Building frontend...")
     res = subprocess.run([str(npm_exe), "--prefix", "frontend", "run", "build"], env=env, check=False)
     if res.returncode == 0:
-        print_ok("Frontend built successfully into frontend/dist")
+        dist_dir = Path("frontend/dist")
+        index_html = dist_dir / "index.html"
+        if index_html.is_file():
+            content = index_html.read_text(encoding="utf-8")
+            (dist_dir / "404.html").write_text(content, encoding="utf-8")
+            users_dir = dist_dir / "users"
+            users_dir.mkdir(parents=True, exist_ok=True)
+            (users_dir / "index.html").write_text(content, encoding="utf-8")
+        print_ok("Frontend built successfully into frontend/dist (with SPA routing for /users)")
     else:
         sys.exit(res.returncode)
 
