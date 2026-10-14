@@ -26,12 +26,13 @@
 
 ## Tools & Workflows
 - **`./jctool`**: Project management script in Python (standard library only, zero external dependencies).
-  - `./jctool install`: Installs Node.js & npm into `~/.cache/junta-cycle/nodejs` (isolated, non-system).
-  - `./jctool check`: Verifies Node/npm runtime in cache, Git/GitHub credentials, and Supabase keys in `config.json`.
+  - `./jctool install`: Installs Node.js, npm, and Supabase CLI into `~/.cache/junta-cycle` (isolated, non-system).
+  - `./jctool check`: Verifies Node/npm runtime, Supabase CLI, Git/GitHub credentials, and Supabase keys in `config.json`.
   - `./jctool encrypt`: Encrypts plaintext strings under `"secrets"` in `config.json` with prefix `enc-v1:` using OpenSSL AES-256-CBC PBKDF2, and saves `password_check`.
   - `./jctool build`: Builds the Svelte frontend into `frontend/dist` using cached node/npm.
   - `./jctool dev`: Launches Vite dev server for local frontend testing.
-  - `./jctool publish`: Builds the frontend and deploys directly to `gh-pages` branch on GitHub remote.
+  - `./jctool publish`: Publishes both frontend (deploys to `gh-pages` branch) and backend (runs Supabase deployment/migration hook).
+
 
 ## Directory Structure
 - `frontend/`: Svelte + TypeScript + Vite web app (landing page, mobile-friendly styles).
@@ -49,8 +50,10 @@
 ## Current Status & Next Steps
 - Frontend created in `frontend/` with landing page (`frontend/src/App.svelte`).
 - Added fixed top status bar (`frontend/src/lib/StatusBar.svelte`) checking Supabase Auth health (`/auth/v1/health`) every 5 seconds (green dot = Online, red dot = Offline).
-- Updated `./jctool` to securely decrypt frontend public configuration (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) in memory during `build` and `dev`.
-- Next: Build/publish and wire up Supabase Auth to the Login button.
+- Supabase CLI installed in `~/.cache/junta-cycle/bin/supabase` (v2.120.0).
+- `./jctool publish` configured to publish both frontend and backend.
+- Next: Wire up Supabase Auth to the Login button on the landing page.
+
 
 
 

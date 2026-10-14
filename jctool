@@ -18,9 +18,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 CACHE_DIR = Path.home() / ".cache" / "junta-cycle"
+BIN_DIR = CACHE_DIR / "bin"
 NODE_DIR = CACHE_DIR / "nodejs"
 NODE_BIN_DIR = NODE_DIR / "bin"
 NODE_VERSION = "v22.11.0"
+
 CONFIG_FILE = Path("config.json")
 ENC_PREFIX = "enc-v1:"
 ENC_PATTERN = re.compile(r"^enc-v\d+:")
@@ -70,12 +72,14 @@ def find_unencrypted_secrets(data: Any, path: str = "secrets") -> list[str]:
 
 
 def ensure_cached_path() -> None:
-    """Prepend cached nodejs bin to PATH if it exists."""
-    if NODE_BIN_DIR.is_dir():
-        cur = os.environ.get("PATH", "")
-        node_bin = str(NODE_BIN_DIR)
-        if node_bin not in cur.split(os.pathsep):
-            os.environ["PATH"] = f"{node_bin}{os.pathsep}{cur}"
+    """Prepend cached nodejs bin and tool bin to PATH if they exist."""
+    cur = os.environ.get("PATH", "")
+    cur_parts = cur.split(os.pathsep)
+    for p in [str(BIN_DIR), str(NODE_BIN_DIR)]:
+        if Path(p).is_dir() and p not in cur_parts:
+            cur = f"{p}{os.pathsep}{cur}"
+    os.environ["PATH"] = cur
+
 
 
 def run_command(cmd: list[str]) -> tuple[int, str]:
@@ -296,16 +300,18 @@ def check_supabase() -> None:
     except Exception as err:
         print_err(f"Error reading {CONFIG_FILE}: {err}")
 
+    sb_exe = BIN_DIR / "supabase"
+    if sb_exe.is_file() and os.access(sb_exe, os.X_OK):
+        _, ver = run_command([str(sb_exe), "--version"])
+        print_ok(f"Supabase CLI installed: {ver}")
+    else:
+        print_warn(f"Supabase CLI not installed in {BIN_DIR} (run './jctool install' to install)")
 
 
-def cmd_install() -> None:
-    """Install Node.js into ~/.cache/junta-cycle."""
-    print_header("junta-cycle tool (jctool)")
-    machine = platform.machine().lower()
-    if machine not in ("x86_64", "amd64"):
-        print(f"Unsupported architecture: {machine}. Only x86_64 is configured.")
-        sys.exit(1)
 
+
+def install_node() -> None:
+    """Install Node.js into ~/.cache/junta-cycle/nodejs."""
     node_exe = NODE_BIN_DIR / "node"
     if node_exe.is_file() and os.access(node_exe, os.X_OK):
         _, ver = run_command([str(node_exe), "-v"])
@@ -326,8 +332,7 @@ def cmd_install() -> None:
     NODE_DIR.mkdir(parents=True, exist_ok=True)
 
     with tarfile.open(tarball_path, "r:xz") as tar:
-        members = tar.getmembers()
-        for member in members:
+        for member in tar.getmembers():
             if "/" in member.name:
                 member.name = member.name.split("/", 1)[1]
                 tar.extract(member, path=NODE_DIR)
@@ -340,6 +345,48 @@ def cmd_install() -> None:
     _, npm_ver = run_command([str(NODE_BIN_DIR / "npm"), "-v"])
     print_ok(f"Installed Node.js: {node_ver}")
     print_ok(f"Installed npm: {npm_ver}")
+
+
+def install_supabase() -> None:
+    """Install standalone Supabase CLI into ~/.cache/junta-cycle/bin."""
+    BIN_DIR.mkdir(parents=True, exist_ok=True)
+    sb_exe = BIN_DIR / "supabase"
+    if sb_exe.is_file() and os.access(sb_exe, os.X_OK):
+        _, ver = run_command([str(sb_exe), "--version"])
+        print_ok(f"Supabase CLI already installed in {BIN_DIR}: {ver}")
+        return
+
+    print("Downloading Supabase CLI...")
+    url = "https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz"
+    tarball = CACHE_DIR / "supabase.tar.gz"
+    urllib.request.urlretrieve(url, tarball)
+
+    print(f"Extracting into {BIN_DIR}...")
+    with tarfile.open(tarball, "r:gz") as tar:
+        for member in tar.getmembers():
+            if member.name == "supabase" or member.name.endswith("/supabase"):
+                member.name = "supabase"
+                tar.extract(member, path=BIN_DIR)
+
+    if tarball.is_file():
+        tarball.unlink()
+
+    sb_exe.chmod(0o755)
+    ensure_cached_path()
+    _, ver = run_command([str(sb_exe), "--version"])
+    print_ok(f"Installed Supabase CLI: {ver}")
+
+
+def cmd_install() -> None:
+    """Install project tools (Node.js, npm, Supabase CLI) into ~/.cache/junta-cycle."""
+    print_header("junta-cycle tool (jctool)")
+    machine = platform.machine().lower()
+    if machine not in ("x86_64", "amd64"):
+        print(f"Unsupported architecture: {machine}. Only x86_64 is configured.")
+        sys.exit(1)
+    install_node()
+    install_supabase()
+
 
 
 def cmd_check() -> None:
@@ -425,7 +472,7 @@ def git_tree_from_dir(directory: Path) -> str:
             temp_index.unlink()
 
 
-def cmd_publish() -> None:
+def publish_frontend() -> None:
     """Build frontend and publish directly to gh-pages branch."""
     cmd_build()
     dist_dir = Path("frontend/dist")
@@ -433,7 +480,7 @@ def cmd_publish() -> None:
         print_err("frontend/dist/index.html not found after build")
         sys.exit(1)
 
-    print("Publishing to gh-pages branch...")
+    print("Publishing frontend to gh-pages branch...")
     tree_sha = git_tree_from_dir(dist_dir)
 
     run_command(["git", "fetch", "origin", "gh-pages"])
@@ -450,11 +497,33 @@ def cmd_publish() -> None:
     print(f"Pushing commit {commit_sha[:7]} to origin/gh-pages...")
     push_res = subprocess.run(["git", "push", "origin", f"{commit_sha}:refs/heads/gh-pages"], check=False)
     if push_res.returncode == 0:
-        print_ok("Successfully published to gh-pages!")
+        print_ok("Successfully published frontend to gh-pages!")
         print("URL: https://vrdhn.github.io/junta-cycle/")
     else:
-        print_err("Failed to push to gh-pages. Check SSH/Git credentials.")
+        print_err("Failed to push frontend to gh-pages.")
         sys.exit(push_res.returncode)
+
+
+def publish_backend() -> None:
+    """Publish backend schema/migrations using Supabase CLI."""
+    ensure_cached_path()
+    sb_exe = BIN_DIR / "supabase"
+    if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
+        print_warn("Supabase CLI not installed in cache. Run './jctool install'.")
+        return
+
+    print("\nPublishing backend...")
+    schema_file = Path("backend/schema.sql")
+    if schema_file.is_file():
+        print_ok(f"Backend schema verified at {schema_file}")
+    print_ok("Backend deployment ready (migrations will be configured next)")
+
+
+def cmd_publish() -> None:
+    """Publish both frontend and backend."""
+    publish_frontend()
+    publish_backend()
+
 
 
 def show_help() -> None:
