@@ -102,16 +102,18 @@ def openssl_cipher(args: list[str], input_str: str, passphrase: str) -> str:
     cmd = ["openssl", "enc", *args, "-pass", "env:JC_CIPHER_PASS"]
     res = subprocess.run(
         cmd,
-        input=input_str,
+        input=input_str.encode("utf-8"),
         capture_output=True,
-        text=True,
         env=env,
         check=False,
     )
     if res.returncode != 0:
-        err = res.stderr.strip()
+        err = res.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError(f"OpenSSL failed: {err}")
-    return res.stdout.strip()
+    try:
+        return res.stdout.decode("utf-8").strip()
+    except UnicodeDecodeError as exc:
+        raise ValueError("Decryption failed: corrupted data or incorrect passphrase") from exc
 
 
 def encrypt_value(value: str, passphrase: str) -> str:
@@ -533,10 +535,11 @@ def get_db_url(passphrase: str = "") -> str:
 
     if not passphrase:
         passphrase = prompt_passphrase("Enter passphrase to decrypt database credentials: ")
-        check_val = config.get("secrets", {}).get("password_check", "")
-        if check_val and not verify_password(check_val, passphrase):
-            print_err("Incorrect passphrase!")
-            sys.exit(1)
+
+    check_val = config.get("secrets", {}).get("password_check", "")
+    if check_val and not verify_password(check_val, passphrase):
+        print_err("Incorrect passphrase!")
+        sys.exit(1)
 
     raw_pwd = decrypt_value(enc_pwd, passphrase)
     raw_url = decrypt_value(url, passphrase)
@@ -720,6 +723,11 @@ def cmd_func_deploy(passphrase: str = "", fn_name: str = "") -> None:
     if not passphrase:
         passphrase = prompt_passphrase("Enter passphrase to decrypt config: ")
 
+    check_val = config.get("secrets", {}).get("password_check", "")
+    if check_val and not verify_password(check_val, passphrase):
+        print_err("Incorrect passphrase!")
+        sys.exit(1)
+
     url = decrypt_value(enc_url, passphrase)
     project_ref = url.replace("https://", "").split(".")[0]
 
@@ -747,7 +755,12 @@ def cmd_func_deploy(passphrase: str = "", fn_name: str = "") -> None:
 def cmd_publish() -> None:
     """Publish backend migrations, edge functions, and frontend (gh-pages)."""
     print_header("junta-cycle tool (jctool publish)")
+    config = load_config(enforce_encrypted=True)
+    check_val = config.get("secrets", {}).get("password_check", "")
     passphrase = prompt_passphrase("Enter passphrase to publish project: ")
+    if check_val and not verify_password(check_val, passphrase):
+        print_err("Incorrect passphrase!")
+        sys.exit(1)
 
     # 1. Attempt database migration first
     print("\n--- Step 1: Database Migration ---")
