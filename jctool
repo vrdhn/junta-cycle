@@ -741,7 +741,7 @@ def cmd_func_deploy(passphrase: str = "", fn_name: str = "") -> None:
 
     target = fn_name if fn_name else "all functions"
     print_header(f"Deploying Edge Functions ({target}) -> Project: {project_ref}")
-    cmd = [str(sb_exe), "functions", "deploy", "--project-ref", project_ref, "--no-verify-jwt"]
+    cmd = [str(sb_exe), "functions", "deploy", "--project-ref", project_ref, "--no-verify-jwt", "--use-api"]
     if fn_name:
         cmd.append(fn_name)
 
