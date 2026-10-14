@@ -66,6 +66,12 @@
     activeUserEmail = data?.session?.user?.email ?? null;
   }
 
+  interface Props {
+    onNavigate?: (route: "home" | "debug" | "app") => void;
+  }
+
+  let { onNavigate }: Props = $props();
+
   async function loginAs(user: Profile) {
     loggingInEmail = user.email;
     errorMsg = null;
@@ -80,10 +86,12 @@
         errorMsg = `Login failed for ${user.email}: ${error.message}`;
       } else {
         activeUserEmail = data?.user?.email ?? user.email;
-        successMsg = `Logged in as ${user.full_name || user.email}. Redirecting to /app...`;
-        setTimeout(() => {
+        successMsg = `Logged in as ${user.full_name || user.email}`;
+        if (onNavigate) {
+          onNavigate("app");
+        } else {
           window.location.hash = "app";
-        }, 400);
+        }
       }
     } catch (e: any) {
       errorMsg = `Error logging in: ${e.message || e}`;
@@ -118,9 +126,9 @@
   </div>
 
   <div class="header-nav">
-    <a href="./" class="nav-back">← Back to Home</a>
+    <button class="nav-back" onclick={() => onNavigate ? onNavigate("home") : (window.location.hash = "")}>← Back to Home</button>
     {#if activeUserEmail}
-      <a href="#app" class="nav-app">Go to /app ➔</a>
+      <button class="nav-app" onclick={() => onNavigate ? onNavigate("app") : (window.location.hash = "app")}>Go to /app ➔</button>
     {/if}
     <span class="badge-secret">/debug</span>
   </div>
@@ -137,7 +145,7 @@
     </div>
     {#if activeUserEmail}
       <div class="session-actions">
-        <a href="#app" class="btn-app-action">Open /app ➔</a>
+        <button class="btn-app-action" onclick={() => onNavigate ? onNavigate("app") : (window.location.hash = "app")}>Open /app ➔</button>
         <button class="btn-logout" onclick={logout}>Log Out</button>
       </div>
     {/if}
@@ -263,6 +271,9 @@
     align-items: center;
     gap: 0.35rem;
     color: var(--primary-color);
+    background: transparent;
+    border: none;
+    cursor: pointer;
     text-decoration: none;
     font-weight: 600;
     font-size: 0.95rem;
@@ -281,6 +292,8 @@
     align-items: center;
     color: #047857;
     background-color: #d1fae5;
+    border: none;
+    cursor: pointer;
     text-decoration: none;
     font-weight: 700;
     font-size: 0.95rem;
@@ -304,6 +317,8 @@
     align-items: center;
     background-color: var(--primary-color);
     color: white;
+    border: none;
+    cursor: pointer;
     text-decoration: none;
     font-size: 0.85rem;
     font-weight: 600;

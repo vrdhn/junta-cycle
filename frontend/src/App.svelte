@@ -10,15 +10,16 @@
   let sessionLoaded = $state(false);
 
   function checkRoute() {
-    const path = window.location.pathname.replace(/\/+$/, "");
+    const rawPath = window.location.pathname.replace(/\/+$/, "");
     const hash = window.location.hash;
     const search = window.location.search;
 
     let target: "home" | "debug" | "app" = "home";
 
-    if (
-      path.endsWith("/debug") ||
-      path.endsWith("/users") ||
+    // Hash overrides path if explicitly set
+    if (hash === "#app" || hash === "#/app" || search.includes("app")) {
+      target = "app";
+    } else if (
       hash === "#debug" ||
       hash === "#/debug" ||
       hash === "#users" ||
@@ -27,13 +28,10 @@
       search.includes("users")
     ) {
       target = "debug";
-    } else if (
-      path.endsWith("/app") ||
-      hash === "#app" ||
-      hash === "#/app" ||
-      search.includes("app")
-    ) {
+    } else if (rawPath.endsWith("/app")) {
       target = "app";
+    } else if (rawPath.endsWith("/debug") || rawPath.endsWith("/users")) {
+      target = "debug";
     } else {
       target = "home";
     }
@@ -48,20 +46,18 @@
   }
 
   function navigateTo(route: "home" | "debug" | "app") {
-    if (route === "debug") {
-      window.location.hash = "debug";
-    } else if (route === "app") {
-      window.location.hash = "app";
-    } else {
-      window.location.hash = "";
-      if (
-        window.location.pathname.endsWith("/debug") ||
-        window.location.pathname.endsWith("/users") ||
-        window.location.pathname.endsWith("/app")
-      ) {
-        window.history.pushState({}, "", window.location.pathname.replace(/\/(?:debug|users|app)$/, "/") || "./");
-      }
+    const rawPath = window.location.pathname.replace(/\/+$/, "");
+    const basePath = rawPath.replace(/\/(?:debug|users|app)$/, "");
+    window.location.hash = "";
+
+    let newUrl = `${basePath}/`;
+    if (route === "app") {
+      newUrl = `${basePath}/app`;
+    } else if (route === "debug") {
+      newUrl = `${basePath}/debug`;
     }
+
+    window.history.pushState({}, "", newUrl);
     checkRoute();
   }
 
@@ -101,7 +97,7 @@
 <StatusBar />
 
 {#if currentRoute === "debug"}
-  <DebugPage />
+  <DebugPage onNavigate={navigateTo} />
 {:else if currentRoute === "app" && activeUser}
   <AppScreen user={activeUser} onNavigate={navigateTo} onLogout={handleLogout} />
 {:else}
