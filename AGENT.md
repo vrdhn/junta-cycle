@@ -31,7 +31,8 @@
   - `./jctool encrypt`: Encrypts plaintext strings under `"secrets"` in `config.json` with prefix `enc-v1:` using OpenSSL AES-256-CBC PBKDF2, and saves `password_check`.
   - `./jctool build`: Builds the Svelte frontend into `frontend/dist` using cached node/npm.
   - `./jctool dev`: Launches Vite dev server for local frontend testing.
-  - `./jctool db-migrate`: Applies `backend/schema.sql` to the Supabase database.
+  - `./jctool db-migrate`: Applies pending migrations from `backend/migrations/*.sql` to Supabase and records them in `public.schema_migrations`.
+  - `./jctool db-status`: Displays applied vs pending status of all migrations.
   - `./jctool db-query`: Executes SQL queries or files against Supabase (e.g. `./jctool db-query 'SELECT 1;'`).
   - `./jctool publish`: Runs `db-migrate` first; if successful, builds and publishes frontend to `gh-pages`.
 
@@ -39,6 +40,7 @@
 ## Directory Structure
 - `frontend/`: Svelte + TypeScript + Vite web app (landing page, mobile-friendly styles).
 - `backend/`: SQL schemas, migrations, and Supabase functions.
+  - `backend/migrations/`: Sequential `.sql` migration files (e.g., `001_roles_and_profiles.sql`).
 
 ## Configuration & Secrets Management
 - File: `config.json`
@@ -50,17 +52,17 @@
 - Encrypted format: `enc-v1:<base64-ciphertext>`
 
 ## Database Architecture
+- **`public.schema_migrations`**: Table tracking applied migration versions (`version text primary key`, `applied_at timestamptz`).
 - **`public.allowed_roles`**: Table storing allowed roles (`rider`, `manager`, `superuser`).
 - **`public.profiles`**: 1-to-1 extension of `auth.users`, storing `email`, `full_name`, and `roles text[]`.
 - **Integrity**: `validate_roles()` check constraint ensures all elements in `profiles.roles` exist in `allowed_roles`.
 - **Authorization**: `public.has_role(check_role)` helper function enables fast RLS checks (superuser automatically matches).
 - **Trigger**: `on_auth_user_created` trigger automatically provisions a `profiles` entry with `roles = array['rider']` on signup.
-- **Migration Format**: SQL scripts in `backend/` use an explicit `-- statement` comment marker between independent commands to allow clean statement-by-statement execution.
-
+- **Migration Format**: SQL scripts in `backend/migrations/` use explicit `-- statement` comment markers between independent commands to allow clean statement-by-statement execution.
 
 ## Current Status & Next Steps
-- Defined user roles, profiles, validation constraint, and signup trigger in `backend/schema.sql`.
-- Ready to apply migration using `./jctool db-migrate`.
+- Migration tracking engine and `001_roles_and_profiles.sql` implemented.
+- Ready to run `./jctool db-migrate` or `./jctool db-status` with user passphrase.
 - Next: Wire up Supabase Auth login with pre-configured test users.
 
 
