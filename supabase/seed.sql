@@ -3,8 +3,6 @@
 -- Roles distribution: 1 superuser, 3 managers, 9 riders
 -- Default Password for all demo users: junta123
 
-create extension if not exists pgcrypto with schema extensions;
-
 do $$
 declare
   user_rec record;
@@ -12,6 +10,7 @@ declare
   default_pw text := 'junta123';
   encrypted_pw text;
 begin
+  execute 'create extension if not exists pgcrypto with schema extensions';
   encrypted_pw := extensions.crypt(default_pw, extensions.gen_salt('bf'));
 
   for user_rec in
