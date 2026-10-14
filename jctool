@@ -525,11 +525,13 @@ def get_db_url(passphrase: str = "") -> str:
             sys.exit(1)
 
     raw_pwd = decrypt_value(enc_pwd, passphrase)
+    raw_url = decrypt_value(url, passphrase)
     encoded_pwd = urllib.parse.quote_plus(raw_pwd)
 
-    # Extract project ref from URL (e.g. https://<ref>.supabase.co)
-    project_ref = url.replace("https://", "").replace("http://", "").split(".")[0]
+    # Extract project ref from decrypted URL (e.g. https://<ref>.supabase.co)
+    project_ref = raw_url.replace("https://", "").replace("http://", "").split(".")[0]
     return f"postgresql://postgres:{encoded_pwd}@db.{project_ref}.supabase.co:5432/postgres"
+
 
 
 def cmd_db_query(passphrase: str = "") -> None:
