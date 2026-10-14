@@ -5,7 +5,7 @@
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
   const apiKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
-  let isHealthy: boolean | null = null;
+  let isHealthy = $state<boolean | null>(null);
   let timer: ReturnType<typeof setInterval> | null = null;
 
   async function pingHealth() {
@@ -26,7 +26,6 @@
 
 <header class="status-bar">
   <div class="status-inner">
-
     <span class="brand-title">Junta Cycle</span>
     <div class="indicator-group" title={isHealthy === null ? "Checking backend..." : isHealthy ? "Backend connected" : "Backend unreachable"}>
       <span
@@ -83,14 +82,18 @@
   .indicator-group {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.5rem;
   }
 
   .status-dot {
     width: 10px;
     height: 10px;
+    min-width: 10px;
+    min-height: 10px;
     border-radius: 50%;
     display: inline-block;
+    flex-shrink: 0;
+    background-color: #94a3b8;
     transition: background-color 0.3s ease;
   }
 
@@ -114,3 +117,4 @@
     color: var(--text-muted);
   }
 </style>
+
