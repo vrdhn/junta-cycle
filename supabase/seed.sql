@@ -7,6 +7,7 @@ do $$
 declare
   user_rec record;
   new_user_id uuid;
+  id_type text;
   default_pw text := 'junta123';
   encrypted_pw text;
 begin
@@ -67,15 +68,28 @@ begin
         ''
       );
 
+      select data_type into id_type from information_schema.columns
+      where table_schema = 'auth' and table_name = 'identities' and column_name = 'id';
+
       if exists (
         select 1 from information_schema.columns
         where table_schema = 'auth' and table_name = 'identities' and column_name = 'provider_id'
       ) then
-        execute 'insert into auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at) values ($1, $2, $3, $4, $5, now(), now(), now()) on conflict do nothing'
-        using new_user_id::text, new_user_id, jsonb_build_object('sub', new_user_id::text, 'email', user_rec.email), 'email', new_user_id::text;
+        if id_type = 'uuid' then
+          execute 'insert into auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at) values ($1, $2, $3, $4, $5, now(), now(), now()) on conflict do nothing'
+          using new_user_id, new_user_id, jsonb_build_object('sub', new_user_id::text, 'email', user_rec.email), 'email', new_user_id::text;
+        else
+          execute 'insert into auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at) values ($1, $2, $3, $4, $5, now(), now(), now()) on conflict do nothing'
+          using new_user_id::text, new_user_id, jsonb_build_object('sub', new_user_id::text, 'email', user_rec.email), 'email', new_user_id::text;
+        end if;
       else
-        execute 'insert into auth.identities (id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at) values ($1, $2, $3, $4, now(), now(), now()) on conflict do nothing'
-        using new_user_id::text, new_user_id, jsonb_build_object('sub', new_user_id::text, 'email', user_rec.email), 'email';
+        if id_type = 'uuid' then
+          execute 'insert into auth.identities (id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at) values ($1, $2, $3, $4, now(), now(), now()) on conflict do nothing'
+          using new_user_id, new_user_id, jsonb_build_object('sub', new_user_id::text, 'email', user_rec.email), 'email';
+        else
+          execute 'insert into auth.identities (id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at) values ($1, $2, $3, $4, now(), now(), now()) on conflict do nothing'
+          using new_user_id::text, new_user_id, jsonb_build_object('sub', new_user_id::text, 'email', user_rec.email), 'email';
+        end if;
       end if;
 
     else
