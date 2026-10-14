@@ -35,3 +35,4 @@
 - `./jctool db-query`: Executes SQL queries or scripts against the Supabase database.
 - `./jctool func-deploy [name]`: Deploys Supabase Edge Functions.
 - `./jctool publish`: Full deployment pipeline: runs migrations, deploys edge functions, and deploys frontend to `gh-pages`.
+- `./jctool nuke`: Full reset & deployment pipeline: `dbclean` -> `db-migrate` -> `db-demo` -> `publish` with a single passphrase prompt.

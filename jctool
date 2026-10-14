@@ -752,12 +752,13 @@ def cmd_func_deploy(passphrase: str = "", fn_name: str = "") -> None:
     print_ok(f"Edge functions deployed successfully!")
 
 
-def cmd_publish() -> None:
+def cmd_publish(passphrase: str = "") -> None:
     """Publish backend migrations, edge functions, and frontend (gh-pages)."""
     print_header("junta-cycle tool (jctool publish)")
     config = load_config(enforce_encrypted=True)
     check_val = config.get("secrets", {}).get("password_check", "")
-    passphrase = prompt_passphrase("Enter passphrase to publish project: ")
+    if not passphrase:
+        passphrase = prompt_passphrase("Enter passphrase to publish project: ")
     if check_val and not verify_password(check_val, passphrase):
         print_err("Incorrect passphrase!")
         sys.exit(1)
@@ -776,6 +777,35 @@ def cmd_publish() -> None:
     print_ok("Full project publish completed successfully!")
 
 
+def cmd_nuke(passphrase: str = "") -> None:
+    """Full reset and deployment: dbclean -> db-migrate -> db-demo -> publish."""
+    print_header("junta-cycle tool (jctool nuke)")
+    config = load_config(enforce_encrypted=True)
+    check_val = config.get("secrets", {}).get("password_check", "")
+    if not passphrase:
+        passphrase = prompt_passphrase("Enter passphrase to nuke and redeploy: ")
+    if check_val and not verify_password(check_val, passphrase):
+        print_err("Incorrect passphrase!")
+        sys.exit(1)
+
+    print("\n=== Phase 1: Database Clean (Drop all tables & reset migrations) ===")
+    cmd_db_clean(passphrase=passphrase)
+
+    print("\n=== Phase 2: Database Migration ===")
+    cmd_db_migrate(passphrase=passphrase)
+
+    print("\n=== Phase 3: Seed Demo Data ===")
+    cmd_db_demo(passphrase=passphrase)
+
+    print("\n=== Phase 4: Edge Functions Deploy ===")
+    cmd_func_deploy(passphrase=passphrase)
+
+    print("\n=== Phase 5: Build and Publish Frontend to gh-pages ===")
+    publish_frontend(passphrase=passphrase)
+
+    print_ok("\n[NUKE COMPLETE] Database cleaned, migrated, seeded, and full app published to gh-pages!")
+
+
 def show_help() -> None:
     """Show CLI usage."""
     print_header("junta-cycle tool (jctool)")
@@ -787,6 +817,7 @@ def show_help() -> None:
     print("  build       Build the frontend app into frontend/dist")
     print("  dev         Start local development server for frontend")
     print("  publish     Publish project (runs db-migrate first, then deploys to gh-pages)")
+    print("  nuke        Full reset & deploy (dbclean -> db-migrate -> db-demo -> publish)")
     print("  db-migrate  Apply pending migrations to Supabase (transactional via Supabase CLI)")
     print("  db-clean    Drop all tables and reset migration history to start afresh")
     print("  db-status   Show status of database migrations (local vs remote)")
@@ -806,6 +837,7 @@ def main() -> None:
         "build": cmd_build,
         "dev": cmd_dev,
         "publish": cmd_publish,
+        "nuke": cmd_nuke,
         "db-migrate": cmd_db_migrate,
         "db-clean": cmd_db_clean,
         "dbclean": cmd_db_clean,
