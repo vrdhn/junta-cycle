@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { supabase } from "./supabase";
+  import LocationsAdmin from "./LocationsAdmin.svelte";
 
   interface Props {
     user: any;
@@ -249,8 +250,10 @@
 
       {:else if selectedRole === "superuser"}
         <div class="role-view">
+          <LocationsAdmin />
+
           <div class="card">
-            <h2>⚡ Superuser Administration</h2>
+            <h2>⚡ System Administration</h2>
             <p class="card-desc">System configuration, global access controls, and diagnostics.</p>
 
             <div class="superuser-actions">

@@ -10,6 +10,16 @@ declare
   id_type text;
   default_pw text := 'junta123';
   encrypted_pw text;
+  blr_id uuid;
+  pune_id uuid;
+  soc1_id uuid;
+  soc2_id uuid;
+  soc3_id uuid;
+  lm1_id uuid;
+  lm2_id uuid;
+  mgr_bhavna uuid;
+  mgr_chirag uuid;
+  mgr_divya uuid;
 begin
   execute 'create extension if not exists pgcrypto with schema extensions';
   encrypted_pw := extensions.crypt(default_pw, extensions.gen_salt('bf'));
@@ -110,4 +120,55 @@ begin
         roles = excluded.roles;
 
   end loop;
+
+  -- Look up managers for private parkings
+  select id into mgr_bhavna from public.profiles where email = 'bhavna@junta.cycle';
+  select id into mgr_chirag from public.profiles where email = 'chirag@junta.cycle';
+  select id into mgr_divya from public.profiles where email = 'divya@junta.cycle';
+
+  -- Seed Cities
+  insert into public.cities (name) values ('Bengaluru')
+  on conflict (name) do update set name = excluded.name returning id into blr_id;
+
+  insert into public.cities (name) values ('Pune')
+  on conflict (name) do update set name = excluded.name returning id into pune_id;
+
+  -- Seed Places (Societies & Landmarks)
+  insert into public.places (city_id, name, place_type) values (blr_id, 'Palm Meadows', 'society')
+  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into soc1_id;
+
+  insert into public.places (city_id, name, place_type) values (blr_id, 'Green Glen Layout', 'society')
+  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into soc2_id;
+
+  insert into public.places (city_id, name, place_type) values (pune_id, 'Amanora Park Town', 'society')
+  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into soc3_id;
+
+  insert into public.places (city_id, name, place_type) values (blr_id, 'Indiranagar Metro Station', 'landmark')
+  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into lm1_id;
+
+  insert into public.places (city_id, name, place_type) values (blr_id, 'Koramangala Sony World Signal', 'landmark')
+  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into lm2_id;
+
+  -- Seed Private Parkings (Belongs to Society with Assigned Manager)
+  insert into public.parkings (place_id, name, parking_type, manager_id, capacity)
+  values (soc1_id, 'Tower A Cycle Rack', 'private', mgr_bhavna, 12)
+  on conflict (place_id, name) do update set capacity = excluded.capacity, manager_id = excluded.manager_id;
+
+  insert into public.parkings (place_id, name, parking_type, manager_id, capacity)
+  values (soc2_id, 'Clubhouse Stand', 'private', mgr_chirag, 8)
+  on conflict (place_id, name) do update set capacity = excluded.capacity, manager_id = excluded.manager_id;
+
+  insert into public.parkings (place_id, name, parking_type, manager_id, capacity)
+  values (soc3_id, 'Sector 2 Basement Rack', 'private', mgr_divya, 15)
+  on conflict (place_id, name) do update set capacity = excluded.capacity, manager_id = excluded.manager_id;
+
+  -- Seed Public Parkings (Belongs to Landmark)
+  insert into public.parkings (place_id, name, parking_type, capacity)
+  values (lm1_id, 'Metro Gate 1 Rack', 'public', 20)
+  on conflict (place_id, name) do update set capacity = excluded.capacity;
+
+  insert into public.parkings (place_id, name, parking_type, capacity)
+  values (lm2_id, 'Sony World Footpath Stand', 'public', 10)
+  on conflict (place_id, name) do update set capacity = excluded.capacity;
+
 end $$;
