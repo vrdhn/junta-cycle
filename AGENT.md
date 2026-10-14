@@ -1,94 +1,37 @@
-# junta-cycle (jc) - Agent Memory & Project Context
+# junta-cycle (jc) - Agent Policies & Workflows
 
-## Project Overview
-**junta-cycle (jc)** is a SaaS platform enabling community bicycle sharing for commuting. Users can pick up a cycle, commute to their destination, lock and leave it, allowing others to unlock and use it.
-- **Unlocking Mechanism**: Each cycle has a unique QR code identifying it and a physical combination number lock. Scanning the QR code provides the user with the number lock combination to unlock and start their ride.
+## Core Policies
+1. **Zero Assumptions**: Do not assume anything; ask for clarification.
+2. **Minimal Code Units**: Small files, small functions.
+3. **No File Searching Overhead**: Never waste time searching for files; ask.
+4. **Scope of AGENT.md**: Contains ONLY active policies and operational workflows. No past-looking status logs, no future-looking roadmaps, and no data inventory.
+5. **Isolated Runtimes**: Never use system-installed runtimes. All tools (Node.js, npm, Supabase CLI) are maintained strictly in `~/.cache/junta-cycle` and managed via `jctool`.
+6. **Zero Memory Spread**: All agent policy memory resides in this file (`AGENT.md`). Never store memory or state in `$HOME` or other ad-hoc files.
 
-## Tech Stack
-- **Backend / Database**: Supabase (Free tier) - PostgreSQL, Auth, Row-Level Security (RLS), Edge Functions/REST API.
-- **Frontend / Hosting**: GitHub Pages (Client-side static deployment).
-- **Version Control**: GitHub.
-- **Language**: TypeScript.
+## Architecture & Code Policies
+1. **Logic in TypeScript**: All business logic (QR codes, lock combinations, debug endpoints, authorization) lives in TypeScript handlers (Svelte frontend and Supabase Edge Functions).
+2. **Lean PostgreSQL (No RLS)**: PostgreSQL is used strictly as a relational data store. Row Level Security (RLS) is disabled. Keep SQL lean with minimal triggers.
+3. **No Fallback Data**: Never mask backend failures with client-side mock/fallback data. Endpoints must fail transparently and display errors to the user.
+4. **Responsive Styling**: Pure minimal CSS that scales seamlessly from wide desktop screens to mobile devices.
+5. **Hosting**: Static frontend hosted on GitHub Pages (`gh-pages` branch).
 
-## Standing Instructions
-1. **Do not assume anything, ask.**
-2. **Small files, small functions.**
-3. **Don't waste time searching for files, ever. ASK.**
-4. **Tool & Dependency Management**: Do NOT use system installed runtimes. Manage all dependencies/tools in `~/.cache/junta-cycle`. `jctool` must manage and use this cached environment.
-5. **Memory management**: All memory is stored in `AGENT.md` in the repo. No file in `$HOME` or elsewhere should store memory.
+## Security & Secrets Policy
+1. **Secrets Location**: Sensitive configurations reside in `config.json` under `"secrets"`.
+2. **Strict Encryption**: Every secret value in `config.json` must be encrypted with prefix `enc-v1:` using OpenSSL AES-256-CBC with PBKDF2 (100,000 iterations and salt).
+3. **No Plaintext on Disk**: Unencrypted secrets block CLI execution immediately. Decryption to plaintext files on disk is prohibited.
+4. **Passphrase Verification**: User passphrases are validated against `secrets.password_check`.
 
-## Architecture & Technology Decisions
-- **Framework**: Svelte with TypeScript.
-- **Backend Handlers**: TypeScript serverless handlers (Edge Functions) for business logic (QR codes, lock combinations, debug endpoints).
-- **Database**: PostgreSQL (Supabase free tier) - strictly used as a lean relational store; no RLS, minimal SQL triggers.
-- **Styling**: Minimal CSS, responsive across wide desktop screens and mobile devices.
-- **Hosting**: GitHub Pages.
-- **Approach**: Minimal starting scope; defer complex billing, geofencing, and advanced flows.
-
-## Tools & Workflows
-- **`./jctool`**: Project management script in Python (standard library only, zero external dependencies).
-  - `./jctool install`: Installs Node.js, npm, and Supabase CLI into `~/.cache/junta-cycle` (isolated, non-system).
-  - `./jctool check`: Verifies Node/npm runtime, Supabase CLI, Git/GitHub credentials, and Supabase keys in `config.json`.
-  - `./jctool encrypt`: Encrypts plaintext strings under `"secrets"` in `config.json` with prefix `enc-v1:` using OpenSSL AES-256-CBC PBKDF2, and saves `password_check`.
-  - `./jctool build`: Builds the Svelte frontend into `frontend/dist` using cached node/npm.
-  - `./jctool dev`: Launches Vite dev server for local frontend testing.
-  - `./jctool db-migrate`: Applies pending migrations to Supabase transactionally with automatic rollback using `supabase db push`.
-  - `./jctool db-status`: Displays migration status (local vs remote) using `supabase migration list`.
-  - `./jctool db-demo`: Populates database with 10 demo users (Indian names, 1 superuser, 3 managers, 9 riders, password `junta123`).
-  - `./jctool db-new <name>`: Generates a new timestamped migration file in `supabase/migrations/`.
-  - `./jctool func-deploy [name]`: Deploys Edge Functions to Supabase (e.g. `./jctool func-deploy debug`).
-  - `./jctool publish`: Full release command: 1) applies DB migrations, 2) deploys edge functions, 3) builds and publishes frontend to `gh-pages`.
-
-
-## Directory Structure
-- `frontend/`: Svelte + TypeScript + Vite web app (landing page, mobile-friendly styles).
-- `supabase/`:
-  - `supabase/functions/`: TypeScript backend handlers (e.g. `supabase/functions/debug/index.ts`).
-  - `supabase/migrations/`: Timestamped `.sql` migration files (e.g., `20261014000000_roles_and_profiles.sql`).
-  - `supabase/seed.sql`: Demo dataset with 10 Indian-named users in alphabetical order (A through J).
-
-## Configuration & Secrets Management
-- File: `config.json`
-- Top-level `"secrets"` object contains sensitive service configurations (e.g. `"supabase"`: `url`, `anon_key`, `database-password`).
-- **Strict Encryption Policy**: All values under `"secrets"` must always be encrypted with prefix `enc-v*:`. If any value is unencrypted, `jctool` immediately terminates execution with an error telling the user to run `./jctool encrypt` (except for `jctool encrypt` itself).
-- **No Decrypt Command**: Decryption to plaintext disk is disallowed.
-- **Passphrase Verification**: The passphrase itself is encrypted with itself and stored as `secrets.password_check`. When a passphrase is provided, it is validated against this secret.
-- Encryption scheme: OpenSSL AES-256-CBC, PBKDF2 with 100,000 iterations and salt.
-- Encrypted format: `enc-v1:<base64-ciphertext>`
-
-## Database Architecture
-- **Migrations Engine**: Supabase CLI native migration engine (`supabase db push`, `supabase migration list`).
-- **Transactional Rollback**: Each migration file executes in an atomic transaction; on failure, all changes in that file are rolled back.
-- **Tracking Table**: `supabase_migrations.schema_migrations` maintained automatically by Supabase.
-- **No RLS**: Row Level Security is disabled; security and business rules are enforced in TypeScript backend handlers.
-- **`public.allowed_roles`**: Table storing allowed roles (`rider`, `manager`, `superuser`).
-- **`public.profiles`**: 1-to-1 extension of `auth.users`, storing `email`, `full_name`, and `roles text[]`.
-- **Trigger**: Minimal `on_auth_user_created` trigger provisions an initial `profiles` row on user signup.
-- **Demo Users**: 10 users with password `junta123`:
-  - `aarav@junta.cycle` (Aarav Patel): superuser (1 superuser)
-  - `bhavna@junta.cycle` (Bhavna Sharma): manager, rider
-  - `chirag@junta.cycle` (Chirag Gupta): manager, rider
-  - `divya@junta.cycle` (Divya Nair): manager, rider (total 3 managers)
-  - `eshan@junta.cycle` (Eshan Reddy): rider
-  - `fatima@junta.cycle` (Fatima Khan): rider
-  - `gopal@junta.cycle` (Gopal Krishnan): rider
-  - `hema@junta.cycle` (Hema Sundaram): rider
-  - `ishan@junta.cycle` (Ishan Joshi): rider
-  - `jaya@junta.cycle` (Jaya Verma): rider (total 9 riders across 10 users)
-
-## Current Status & Next Steps
-- Created `supabase/seed.sql` and `./jctool db-demo` command.
-- Created `/debug` route (`frontend/src/lib/DebugPage.svelte`) with prominent bold `<DEBUG PAGE, NOT FOR PRODUCTION>` banner.
-- Profiles contain no description (only `id, email, full_name, roles`).
-- Dynamic table displaying users, role badges, and 1-click login.
-- Configured SPA routing in `jctool build` (generating `404.html`, `debug/index.html`, and `users/index.html` for GitHub Pages).
-- Ready to apply migration (`./jctool db-migrate`), seed demo users (`./jctool db-demo`), and publish (`./jctool publish`).
-
-
-
-
-
-
-
-
-
+## Workflows & CLI (`./jctool`)
+- `./jctool install`: Installs Node.js, npm, and Supabase CLI into `~/.cache/junta-cycle`.
+- `./jctool check`: Verifies local runtimes, credentials, and Supabase keys.
+- `./jctool encrypt`: Encrypts plaintext secrets in `config.json` into `enc-v1:` format.
+- `./jctool build`: Builds Svelte frontend into `frontend/dist` with SPA route handling.
+- `./jctool dev`: Runs local Vite development server.
+- `./jctool db-migrate`: Applies pending migrations to Supabase transactionally (`supabase db push`).
+- `./jctool db-clean` (or `dbclean`): Drops all tables, triggers, and resets migration history for fresh starts.
+- `./jctool db-status`: Displays migration status (local vs remote).
+- `./jctool db-demo`: Populates database with 10 demo users from `supabase/seed.sql`.
+- `./jctool db-new <name>`: Generates a new timestamped migration file.
+- `./jctool db-query`: Executes SQL queries or scripts against the Supabase database.
+- `./jctool func-deploy [name]`: Deploys Supabase Edge Functions.
+- `./jctool publish`: Full deployment pipeline: runs migrations, deploys edge functions, and deploys frontend to `gh-pages`.

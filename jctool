@@ -617,6 +617,48 @@ def cmd_db_new() -> None:
         sys.exit(res.returncode)
 
 
+def cmd_db_clean(passphrase: str = "") -> None:
+    """Drop all tables, triggers, and reset migration history to start afresh."""
+    ensure_cached_path()
+    sb_exe = BIN_DIR / "supabase"
+    if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
+        print_err("Supabase CLI not found. Run './jctool install' first.")
+        sys.exit(1)
+
+    db_url = get_db_url(passphrase)
+    print_header("Cleaning Database (Dropping Tables & Resetting Migrations)")
+
+    sql = """
+    do $$
+    declare
+      r record;
+    begin
+      drop trigger if exists on_auth_user_created on auth.users;
+      drop function if exists public.handle_new_user() cascade;
+
+      for r in (select tablename from pg_tables where schemaname = 'public') loop
+        execute 'drop table if exists public.' || quote_ident(r.tablename) || ' cascade';
+      end loop;
+
+      delete from auth.users where email like '%@junta.cycle';
+
+      if exists (
+        select 1 from information_schema.tables 
+        where table_schema = 'supabase_migrations' and table_name = 'schema_migrations'
+      ) then
+        truncate table supabase_migrations.schema_migrations;
+      end if;
+    end $$;
+    """
+
+    cmd = [str(sb_exe), "db", "query", "--db-url", db_url, sql]
+    res = subprocess.run(cmd, check=False)
+    if res.returncode != 0:
+        print_err("Database clean failed.")
+        sys.exit(res.returncode)
+    print_ok("Database successfully cleaned. All public tables dropped and migration history reset.")
+
+
 def cmd_db_demo(passphrase: str = "") -> None:
     """Populate test database with 10 demo users (Indian names, various roles)."""
     ensure_cached_path()
@@ -733,6 +775,7 @@ def show_help() -> None:
     print("  dev         Start local development server for frontend")
     print("  publish     Publish project (runs db-migrate first, then deploys to gh-pages)")
     print("  db-migrate  Apply pending migrations to Supabase (transactional via Supabase CLI)")
+    print("  db-clean    Drop all tables and reset migration history to start afresh")
     print("  db-status   Show status of database migrations (local vs remote)")
     print("  db-demo     Populate database with 10 demo users (Aarav to Jaya, 1 super, 3 mgr, 9 rider)")
     print("  db-new      Create a new timestamped migration file in supabase/migrations/")
@@ -751,6 +794,8 @@ def main() -> None:
         "dev": cmd_dev,
         "publish": cmd_publish,
         "db-migrate": cmd_db_migrate,
+        "db-clean": cmd_db_clean,
+        "dbclean": cmd_db_clean,
         "db-status": cmd_db_status,
         "db-demo": cmd_db_demo,
         "db-new": cmd_db_new,
