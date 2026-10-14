@@ -133,21 +133,21 @@ begin
   insert into public.cities (name) values ('Pune')
   on conflict (name) do update set name = excluded.name returning id into pune_id;
 
-  -- Seed Places (Societies & Landmarks)
-  insert into public.places (city_id, name, place_type) values (blr_id, 'Palm Meadows', 'society')
-  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into soc1_id;
+  -- Seed Places
+  insert into public.places (city_id, name) values (blr_id, 'Palm Meadows')
+  on conflict (city_id, name) do update set name = excluded.name returning id into soc1_id;
 
-  insert into public.places (city_id, name, place_type) values (blr_id, 'Green Glen Layout', 'society')
-  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into soc2_id;
+  insert into public.places (city_id, name) values (blr_id, 'Green Glen Layout')
+  on conflict (city_id, name) do update set name = excluded.name returning id into soc2_id;
 
-  insert into public.places (city_id, name, place_type) values (pune_id, 'Amanora Park Town', 'society')
-  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into soc3_id;
+  insert into public.places (city_id, name) values (pune_id, 'Amanora Park Town')
+  on conflict (city_id, name) do update set name = excluded.name returning id into soc3_id;
 
-  insert into public.places (city_id, name, place_type) values (blr_id, 'Indiranagar Metro Station', 'landmark')
-  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into lm1_id;
+  insert into public.places (city_id, name) values (blr_id, 'Indiranagar Metro Station')
+  on conflict (city_id, name) do update set name = excluded.name returning id into lm1_id;
 
-  insert into public.places (city_id, name, place_type) values (blr_id, 'Koramangala Sony World Signal', 'landmark')
-  on conflict (city_id, name) do update set place_type = excluded.place_type returning id into lm2_id;
+  insert into public.places (city_id, name) values (blr_id, 'Koramangala Sony World Signal')
+  on conflict (city_id, name) do update set name = excluded.name returning id into lm2_id;
 
   -- Seed Private Parkings (Belongs to Society with Assigned Manager)
   insert into public.parkings (place_id, name, parking_type, manager_id, capacity)

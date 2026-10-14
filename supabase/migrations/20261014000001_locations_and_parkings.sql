@@ -1,5 +1,5 @@
 -- Migration: 20261014000001_locations_and_parkings.sql
--- Description: Unified Place and Parking schema: City -> Place (Society / Landmark) -> Parking (Private / Public)
+-- Description: Unified City -> Place -> Stand (Parking) schema
 
 -- 1. Cities
 create table if not exists public.cities (
@@ -8,17 +8,16 @@ create table if not exists public.cities (
   created_at timestamptz default now()
 );
 
--- 2. Places (Societies and Landmarks belonging to a City)
+-- 2. Places (Belongs to a City)
 create table if not exists public.places (
   id uuid primary key default gen_random_uuid(),
   city_id uuid not null references public.cities(id),
   name text not null,
-  place_type text not null check (place_type in ('society', 'landmark')),
   created_at timestamptz default now(),
   unique(city_id, name)
 );
 
--- 3. Parkings (Belongs to a Place, with optional manager for private parkings)
+-- 3. Parkings / Stands (Belongs to a Place, type: private/public, manager_id for private)
 create table if not exists public.parkings (
   id uuid primary key default gen_random_uuid(),
   place_id uuid not null references public.places(id),

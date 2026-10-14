@@ -11,7 +11,6 @@
     id: string;
     city_id: string;
     name: string;
-    place_type: "society" | "landmark";
     city_name?: string;
   }
 
@@ -24,12 +23,11 @@
   interface Parking {
     id: string;
     place_id: string;
-    name: string;
+    name: string; // Stand name
     parking_type: "private" | "public";
     manager_id: string | null;
     capacity: number;
     place_name?: string;
-    place_type?: "society" | "landmark";
     city_name?: string;
     manager_name?: string;
   }
@@ -47,7 +45,6 @@
   let newCityName = $state("");
   let newPlaceCityId = $state("");
   let newPlaceName = $state("");
-  let newPlaceType = $state<"society" | "landmark">("society");
 
   let newParkingPlaceId = $state("");
   let newParkingName = $state("");
@@ -56,16 +53,6 @@
   let newParkingCapacity = $state(10);
 
   let activeModal = $state<"city" | "place" | "parking" | null>(null);
-
-  // When selected place changes for new parking, automatically set default parking type
-  $effect(() => {
-    if (newParkingPlaceId) {
-      const pl = places.find((p) => p.id === newParkingPlaceId);
-      if (pl) {
-        newParkingType = pl.place_type === "society" ? "private" : "public";
-      }
-    }
-  });
 
   async function loadData() {
     loading = true;
@@ -108,19 +95,16 @@
       parkings = (parkRes.data || []).map((p: any) => {
         let cityName = "—";
         let placeName = "—";
-        let placeType: "society" | "landmark" = "society";
 
         if (placeMap.has(p.place_id)) {
           const pl = placeMap.get(p.place_id)!;
           placeName = pl.name;
-          placeType = pl.place_type;
           cityName = pl.city_name || "—";
         }
 
         return {
           ...p,
           place_name: placeName,
-          place_type: placeType,
           city_name: cityName,
           manager_name: p.manager_id ? mgrMap.get(p.manager_id) || "Assigned" : "—",
         };
@@ -156,10 +140,9 @@
       const { error } = await supabase.from("places").insert({
         city_id: newPlaceCityId,
         name: newPlaceName.trim(),
-        place_type: newPlaceType,
       });
       if (error) throw error;
-      successMsg = `Added ${newPlaceType === "society" ? "Society" : "Landmark"} "${newPlaceName.trim()}"`;
+      successMsg = `Added Place "${newPlaceName.trim()}"`;
       newPlaceName = "";
       activeModal = null;
       await loadData();
@@ -181,7 +164,7 @@
         capacity: Number(newParkingCapacity) || 10,
       });
       if (error) throw error;
-      successMsg = `Added ${newParkingType} parking "${newParkingName.trim()}"`;
+      successMsg = `Added ${newParkingType} stand "${newParkingName.trim()}"`;
       newParkingName = "";
       newParkingManagerId = "";
       newParkingCapacity = 10;
@@ -200,13 +183,13 @@
 <div class="locations-admin">
   <div class="admin-top-bar">
     <div>
-      <h3>📍 Location &amp; Parking Registry</h3>
-      <p class="admin-subtitle">Unified schema: City ➔ Place (Society / Landmark) ➔ Parking</p>
+      <h3>📍 Parking Directory</h3>
+      <p class="admin-subtitle">City ➔ Place ➔ Stand ➔ Type ➔ Manager ➔ CAP</p>
     </div>
     <div class="btn-group">
       <button class="btn-action" onclick={() => (activeModal = "city")}>+ Add City</button>
       <button class="btn-action" onclick={() => (activeModal = "place")}>+ Add Place</button>
-      <button class="btn-action btn-highlight" onclick={() => (activeModal = "parking")}>+ Add Parking</button>
+      <button class="btn-action btn-highlight" onclick={() => (activeModal = "parking")}>+ Add Stand</button>
       <button class="btn-refresh" onclick={loadData} title="Refresh data">↻</button>
     </div>
   </div>
@@ -239,13 +222,9 @@
             <option value={c.id}>{c.name}</option>
           {/each}
         </select>
-        <select bind:value={newPlaceType}>
-          <option value="society">Society (Private)</option>
-          <option value="landmark">Landmark (Public)</option>
-        </select>
         <input
           type="text"
-          placeholder={newPlaceType === "society" ? "Society name (e.g. Palm Meadows)" : "Landmark name (e.g. Metro Station)"}
+          placeholder="Place name (e.g. Palm Meadows, Indiranagar Metro)"
           bind:value={newPlaceName}
         />
         <div class="form-buttons">
@@ -254,7 +233,7 @@
         </div>
       </div>
     </div>
-  <!-- Modal: Add Parking -->
+  <!-- Modal: Add Parking Stand -->
   {:else if activeModal === "parking"}
     <div class="form-card">
       <h4>Add Parking Stand</h4>
@@ -262,15 +241,15 @@
         <select bind:value={newParkingPlaceId}>
           <option value="" disabled selected>Select Place</option>
           {#each places as pl}
-            <option value={pl.id}>
-              {pl.name} ({pl.place_type === "society" ? "Society" : "Landmark"} - {pl.city_name})
-            </option>
+            <option value={pl.id}>{pl.name} ({pl.city_name})</option>
           {/each}
         </select>
 
+        <input type="text" placeholder="Stand Name (e.g. Tower A Rack, Gate 1 Stand)" bind:value={newParkingName} />
+
         <select bind:value={newParkingType}>
-          <option value="private">Private Parking</option>
-          <option value="public">Public Parking</option>
+          <option value="private">Private (Society)</option>
+          <option value="public">Public (Landmark)</option>
         </select>
 
         {#if newParkingType === "private"}
@@ -282,59 +261,48 @@
           </select>
         {/if}
 
-        <input type="text" placeholder="Parking Stand Name (e.g. Stand A)" bind:value={newParkingName} />
-        <input type="number" min="1" max="100" placeholder="Capacity (e.g. 10)" bind:value={newParkingCapacity} />
+        <input type="number" min="1" max="100" placeholder="CAP (e.g. 10)" bind:value={newParkingCapacity} />
 
         <div class="form-buttons">
-          <button class="btn-submit" onclick={addParking} disabled={!newParkingPlaceId || !newParkingName.trim()}>Save Parking</button>
+          <button class="btn-submit" onclick={addParking} disabled={!newParkingPlaceId || !newParkingName.trim()}>Save Stand</button>
           <button class="btn-cancel" onclick={() => (activeModal = null)}>Cancel</button>
         </div>
       </div>
     </div>
   {/if}
 
-  <!-- Parkings Directory Table -->
+  <!-- Parking Directory Table: City => Place => Stand => Type => Manager => CAP -->
   <div class="table-card">
     <div class="table-header">
-      <h4>Parkings Directory ({parkings.length} total)</h4>
-      <span class="badge-tag">CITY ➔ PLACE ➔ PARKING</span>
+      <h4>Parking Directory ({parkings.length} total)</h4>
+      <span class="badge-tag">CITY ➔ PLACE ➔ STAND ➔ TYPE ➔ MANAGER ➔ CAP</span>
     </div>
     {#if loading}
-      <div class="table-loading">Loading locations and parkings...</div>
+      <div class="table-loading">Loading parking directory...</div>
     {:else if parkings.length === 0}
-      <div class="table-empty">No parkings defined yet. Use the buttons above to add cities, places, and parkings.</div>
+      <div class="table-empty">No parking stands defined yet. Use the buttons above to add cities, places, and stands.</div>
     {:else}
       <div class="table-responsive">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Parking Stand</th>
-              <th>Parking Type</th>
-              <th>Place</th>
-              <th>Place Type</th>
               <th>City</th>
-              <th>Assigned Manager</th>
-              <th>Capacity</th>
+              <th>Place</th>
+              <th>Stand</th>
+              <th>Type</th>
+              <th>Manager</th>
+              <th class="col-cap">CAP</th>
             </tr>
           </thead>
           <tbody>
             {#each parkings as p}
               <tr>
-                <td><strong>{p.name}</strong></td>
+                <td class="col-city">{p.city_name}</td>
+                <td class="col-place"><strong>{p.place_name}</strong></td>
+                <td class="col-stand">{p.name}</td>
                 <td>
                   <span class={`badge-ptype ptype-${p.parking_type}`}>{p.parking_type}</span>
                 </td>
-                <td>
-                  {#if p.place_type === "society"}
-                    <span class="text-soc">🏢 {p.place_name}</span>
-                  {:else}
-                    <span class="text-lm">🏛️ {p.place_name}</span>
-                  {/if}
-                </td>
-                <td>
-                  <span class="badge-place-type">{p.place_type}</span>
-                </td>
-                <td>{p.city_name}</td>
                 <td>
                   {#if p.parking_type === "private"}
                     {#if p.manager_name && p.manager_name !== "—"}
@@ -343,10 +311,10 @@
                       <span class="text-muted">Unassigned</span>
                     {/if}
                   {:else}
-                    <span class="text-muted">Public (N/A)</span>
+                    <span class="text-muted">—</span>
                   {/if}
                 </td>
-                <td>{p.capacity} racks</td>
+                <td class="col-cap"><strong>{p.capacity}</strong></td>
               </tr>
             {/each}
           </tbody>
@@ -355,40 +323,23 @@
     {/if}
   </div>
 
-  <!-- Places Summary Grid -->
-  <div class="grid-two">
-    <div class="summary-card">
-      <div class="summary-header">
-        <h4>🏢 Societies ({places.filter((p) => p.place_type === "society").length})</h4>
-        <span class="badge-mini">Private Places</span>
-      </div>
-      <ul class="simple-list">
-        {#each places.filter((p) => p.place_type === "society") as s}
-          <li>
-            <strong>{s.name}</strong>
-            <span class="list-sub">{s.city_name}</span>
-          </li>
-        {:else}
-          <li class="empty-li">No societies defined.</li>
-        {/each}
-      </ul>
+  <!-- Places Summary -->
+  <div class="summary-card">
+    <div class="summary-header">
+      <h4>📍 Registered Places ({places.length})</h4>
     </div>
-
-    <div class="summary-card">
-      <div class="summary-header">
-        <h4>🏛️ Landmarks ({places.filter((p) => p.place_type === "landmark").length})</h4>
-        <span class="badge-mini">Public Places</span>
-      </div>
-      <ul class="simple-list">
-        {#each places.filter((p) => p.place_type === "landmark") as l}
-          <li>
-            <strong>{l.name}</strong>
-            <span class="list-sub">{l.city_name}</span>
-          </li>
-        {:else}
-          <li class="empty-li">No landmarks defined.</li>
-        {/each}
-      </ul>
+    <div class="places-grid">
+      {#each places as pl}
+        <div class="place-pill">
+          <span class="place-city">{pl.city_name}</span>
+          <span class="place-name">{pl.name}</span>
+          <span class="place-count">
+            {parkings.filter((p) => p.place_id === pl.id).length} stands
+          </span>
+        </div>
+      {:else}
+        <div class="empty-li">No places registered yet.</div>
+      {/each}
     </div>
   </div>
 </div>
@@ -416,6 +367,8 @@
     font-size: 0.85rem;
     color: var(--text-muted);
     margin-top: 0.2rem;
+    font-family: monospace;
+    font-weight: 600;
   }
 
   .btn-group {
@@ -577,6 +530,24 @@
     font-weight: 700;
   }
 
+  .col-city {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .col-place {
+    color: var(--text-main);
+  }
+
+  .col-stand {
+    color: var(--text-main);
+  }
+
+  .col-cap {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
   .badge-ptype {
     padding: 0.2rem 0.55rem;
     border-radius: 9999px;
@@ -595,13 +566,6 @@
     color: #92400e;
   }
 
-  .badge-place-type {
-    text-transform: capitalize;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #64748b;
-  }
-
   .manager-badge {
     background: #dcfce7;
     color: #15803d;
@@ -611,57 +575,58 @@
     font-size: 0.85rem;
   }
 
-  .text-soc { color: #0284c7; font-weight: 600; }
-  .text-lm { color: #b45309; font-weight: 600; }
   .text-muted { color: #94a3b8; font-size: 0.85rem; }
-
-  .grid-two {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1rem;
-  }
 
   .summary-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 0.75rem;
-    padding: 1rem;
+    padding: 1.25rem;
   }
 
   .summary-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.85rem;
   }
 
-  .badge-mini {
-    font-size: 0.7rem;
-    font-weight: 700;
-    padding: 0.15rem 0.45rem;
-    border-radius: 9999px;
-    background: #f1f5f9;
+  .summary-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-main);
   }
 
-  .simple-list {
-    list-style: none;
+  .places-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .place-pill {
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 0.65rem 0.85rem;
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
-    font-size: 0.875rem;
+    gap: 0.2rem;
   }
 
-  .simple-list li {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.35rem 0;
-    border-bottom: 1px solid #f1f5f9;
-  }
-
-  .list-sub {
+  .place-city {
     font-size: 0.75rem;
-    color: #64748b;
+    color: var(--primary-color);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .place-name {
+    font-size: 0.95rem;
     font-weight: 600;
+    color: var(--text-main);
+  }
+
+  .place-count {
+    font-size: 0.8rem;
+    color: var(--text-muted);
   }
 
   .table-loading, .table-empty {
