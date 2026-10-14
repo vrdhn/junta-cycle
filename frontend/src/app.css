@@ -1,11 +1,95 @@
 :root {
   --primary-color: #0d9488;
   --primary-hover: #0f766e;
+  --primary-subtle: rgba(13, 148, 136, 0.12);
+
+  /* Light Theme (Default) */
   --bg-color: #f8fafc;
   --card-bg: #ffffff;
-  --text-main: #1e293b;
+  --card-bg-subtle: #f1f5f9;
+  --card-header-bg: #f8fafc;
+  --text-main: #0f172a;
   --text-muted: #64748b;
+  --text-secondary: #334155;
   --border-color: #e2e8f0;
+  --border-subtle: #cbd5e1;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --status-bar-bg: rgba(255, 255, 255, 0.95);
+  --table-hover: rgba(0, 0, 0, 0.02);
+  --highlight-box: #f0fdfa;
+  --active-row-bg: #f0f7ff;
+  --warning-row-bg: #fffbeb;
+  --lock-bg: #fffbeb;
+  --lock-digits: #b45309;
+}
+
+/* Automatic Dark Mode based on OS/browser preference */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-color: #0b1120;
+    --card-bg: #151e2e;
+    --card-bg-subtle: #1e293b;
+    --card-header-bg: #0f172a;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --text-secondary: #cbd5e1;
+    --border-color: #26354a;
+    --border-subtle: #334155;
+    --input-bg: #090e1a;
+    --input-border: #3b4d66;
+    --status-bar-bg: rgba(11, 17, 32, 0.95);
+    --table-hover: rgba(255, 255, 255, 0.03);
+    --highlight-box: rgba(13, 148, 136, 0.15);
+    --active-row-bg: rgba(37, 99, 235, 0.15);
+    --warning-row-bg: rgba(245, 158, 11, 0.12);
+    --lock-bg: #0b1329;
+    --lock-digits: #fbbf24;
+  }
+}
+
+/* Explicit User Override: Dark */
+[data-theme="dark"] {
+  --bg-color: #0b1120;
+  --card-bg: #151e2e;
+  --card-bg-subtle: #1e293b;
+  --card-header-bg: #0f172a;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-secondary: #cbd5e1;
+  --border-color: #26354a;
+  --border-subtle: #334155;
+  --input-bg: #090e1a;
+  --input-border: #3b4d66;
+  --status-bar-bg: rgba(11, 17, 32, 0.95);
+  --table-hover: rgba(255, 255, 255, 0.03);
+  --highlight-box: rgba(13, 148, 136, 0.15);
+  --active-row-bg: rgba(37, 99, 235, 0.15);
+  --warning-row-bg: rgba(245, 158, 11, 0.12);
+  --lock-bg: #0b1329;
+  --lock-digits: #fbbf24;
+}
+
+/* Explicit User Override: Light */
+[data-theme="light"] {
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --card-bg-subtle: #f1f5f9;
+  --card-header-bg: #f8fafc;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-secondary: #334155;
+  --border-color: #e2e8f0;
+  --border-subtle: #cbd5e1;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --status-bar-bg: rgba(255, 255, 255, 0.95);
+  --table-hover: rgba(0, 0, 0, 0.02);
+  --highlight-box: #f0fdfa;
+  --active-row-bg: #f0f7ff;
+  --warning-row-bg: #fffbeb;
+  --lock-bg: #fffbeb;
+  --lock-digits: #b45309;
 }
 
 * {
@@ -22,6 +106,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #app {
@@ -33,3 +118,7 @@ body {
   padding: 3.5rem 0 1.5rem;
 }
 
+/* Universal Input/Select styling defaults */
+input, select, textarea {
+  color-scheme: light dark;
+}

@@ -432,7 +432,7 @@
     align-items: center;
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
-    background: #fafafa;
+    background: var(--card-header-bg);
     gap: 0.75rem;
     flex-wrap: wrap;
   }
@@ -449,9 +449,9 @@
     font-weight: 600;
     padding: 0.2rem 0.65rem;
     border-radius: 9999px;
-    background: #f1f5f9;
-    color: #475569;
-    border: 1px solid #cbd5e1;
+    background: var(--card-bg-subtle);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 
@@ -463,21 +463,21 @@
   }
 
   .btn-refresh {
-    background: #ffffff;
+    background: var(--card-bg-subtle);
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
     padding: 0.4rem 0.85rem;
     font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--text-main);
     transition: all 0.15s ease;
   }
 
   .btn-refresh:hover {
-    background: #f8fafc;
+    background: var(--input-bg);
     color: var(--text-main);
-    border-color: #cbd5e1;
+    border-color: var(--primary-color);
   }
 
   .table-loading,
@@ -503,8 +503,8 @@
   }
 
   .users-table th {
-    background: #f8fafc;
-    color: #475569;
+    background: var(--card-header-bg);
+    color: var(--text-muted);
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -520,6 +520,7 @@
   .users-table td {
     padding: 0.875rem 1rem;
     border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
     vertical-align: middle;
     transition: background-color 0.15s ease;
   }
@@ -529,11 +530,11 @@
   }
 
   .users-table tr:hover td {
-    background-color: #f8fafc;
+    background-color: var(--table-hover);
   }
 
   .users-table tr.current-user td {
-    background-color: #f0fdf4;
+    background-color: var(--active-row-bg);
   }
 
   .users-table tr.current-user td:first-child {
@@ -541,7 +542,7 @@
   }
 
   .col-num {
-    color: #94a3b8;
+    color: var(--text-muted);
     width: 44px;
     font-size: 0.825rem;
     font-variant-numeric: tabular-nums;
@@ -551,8 +552,8 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    background: #f0fdfa;
-    border: 1px solid #ccfbf1;
+    background: var(--highlight-box);
+    border: 1px solid var(--border-color);
     padding: 0.4rem 0.75rem;
     border-radius: 0.5rem;
     cursor: pointer;
@@ -564,9 +565,8 @@
   }
 
   .btn-login-user:hover:not(:disabled) {
-    background: #ccfbf1;
-    border-color: #99f6e4;
-    color: #0f766e;
+    background: var(--card-bg-subtle);
+    border-color: var(--primary-color);
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(13, 148, 136, 0.12);
   }

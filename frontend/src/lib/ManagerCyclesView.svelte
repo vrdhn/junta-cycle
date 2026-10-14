@@ -588,7 +588,7 @@
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
-    background: #f8fafc;
+    background: var(--card-bg-subtle);
     border: 1px solid var(--border-color);
     padding: 0.75rem 1rem;
     border-radius: 0.5rem;
@@ -607,7 +607,8 @@
     border: 1px solid var(--border-color);
     border-radius: 0.375rem;
     font-size: 0.9rem;
-    background: white;
+    background: var(--input-bg);
+    color: var(--text-main);
   }
 
   .btn-toggle-add {
@@ -627,7 +628,7 @@
   }
 
   .add-cycle-card {
-    background: #f0fdfa;
+    background: var(--highlight-box);
     border: 2px dashed var(--primary-color);
   }
 
@@ -648,7 +649,8 @@
     border: 1px solid var(--border-color);
     border-radius: 0.375rem;
     font-size: 0.9rem;
-    background: white;
+    background: var(--input-bg);
+    color: var(--text-main);
   }
 
   .form-actions {
@@ -668,9 +670,9 @@
   }
 
   .btn-cancel {
-    background: #e2e8f0;
-    color: #475569;
-    border: none;
+    background: var(--card-bg-subtle);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
     padding: 0.5rem 0.85rem;
     border-radius: 0.375rem;
     font-weight: 600;
@@ -684,7 +686,7 @@
   }
 
   .stat-pill {
-    background: white;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
     padding: 0.85rem;
@@ -730,16 +732,18 @@
     align-items: center;
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
-    background: #f8fafc;
+    background: var(--card-header-bg);
   }
 
   .table-header h3 {
     margin: 0;
     font-size: 1.05rem;
+    color: var(--text-main);
   }
 
   .btn-refresh {
-    background: white;
+    background: var(--card-bg-subtle);
+    color: var(--text-main);
     border: 1px solid var(--border-color);
     padding: 0.35rem 0.75rem;
     border-radius: 0.375rem;
@@ -762,10 +766,11 @@
   .cycles-table th, .cycles-table td {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
   }
 
   .cycles-table th {
-    background: #f8fafc;
+    background: var(--card-header-bg);
     color: var(--text-muted);
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -773,11 +778,11 @@
   }
 
   .row-warning {
-    background-color: #fffbeb;
+    background-color: var(--warning-row-bg);
   }
 
   .row-checked-out {
-    background-color: #f0f7ff;
+    background-color: var(--active-row-bg);
   }
 
   .col-custody {
@@ -884,7 +889,8 @@
     font-size: 0.8rem;
     border: 1px solid var(--border-color);
     border-radius: 0.25rem;
-    background: white;
+    background: var(--input-bg);
+    color: var(--text-main);
     cursor: pointer;
   }
 
@@ -906,9 +912,9 @@
   .lock-code-badge {
     display: inline-flex;
     align-items: center;
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    color: #334155;
+    background: var(--card-bg-subtle);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
     font-weight: 700;
     font-family: monospace;
     font-size: 0.85rem;

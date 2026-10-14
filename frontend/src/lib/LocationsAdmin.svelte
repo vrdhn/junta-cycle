@@ -379,7 +379,7 @@
   }
 
   .btn-action {
-    background: white;
+    background: var(--card-bg-subtle);
     border: 1px solid var(--border-color);
     padding: 0.4rem 0.85rem;
     border-radius: 0.5rem;
@@ -391,7 +391,7 @@
   }
 
   .btn-action:hover {
-    background: #f1f5f9;
+    background: var(--input-bg);
   }
 
   .btn-highlight {
@@ -405,7 +405,8 @@
   }
 
   .btn-refresh {
-    background: white;
+    background: var(--card-bg-subtle);
+    color: var(--text-main);
     border: 1px solid var(--border-color);
     padding: 0.4rem 0.65rem;
     border-radius: 0.5rem;
@@ -414,7 +415,7 @@
   }
 
   .form-card {
-    background: #f8fafc;
+    background: var(--highlight-box);
     border: 2px dashed var(--primary-color);
     border-radius: 0.75rem;
     padding: 1.25rem;
@@ -447,7 +448,8 @@
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
     font-size: 0.9rem;
-    background: white;
+    background: var(--input-bg);
+    color: var(--text-main);
   }
 
   .form-buttons {
@@ -466,9 +468,9 @@
   }
 
   .btn-cancel {
-    background: #e2e8f0;
-    color: #475569;
-    border: none;
+    background: var(--card-bg-subtle);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
     padding: 0.5rem 0.85rem;
     border-radius: 0.5rem;
     font-weight: 600;
@@ -487,21 +489,23 @@
     justify-content: space-between;
     align-items: center;
     padding: 0.85rem 1.25rem;
-    background: #f8fafc;
+    background: var(--card-header-bg);
     border-bottom: 1px solid var(--border-color);
   }
 
   .table-header h4 {
     margin: 0;
     font-size: 1.05rem;
+    color: var(--text-main);
   }
 
   .badge-tag {
     font-size: 0.75rem;
     font-weight: 700;
     font-family: monospace;
-    color: #475569;
-    background: #e2e8f0;
+    color: var(--text-muted);
+    background: var(--card-bg-subtle);
+    border: 1px solid var(--border-color);
     padding: 0.2rem 0.5rem;
     border-radius: 0.25rem;
   }
@@ -520,10 +524,11 @@
   .data-table th, .data-table td {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
   }
 
   .data-table th {
-    background: #f8fafc;
+    background: var(--card-header-bg);
     color: var(--text-muted);
     font-size: 0.75rem;
     text-transform: uppercase;

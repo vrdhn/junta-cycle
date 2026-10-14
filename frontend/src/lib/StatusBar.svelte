@@ -40,7 +40,39 @@
     userName = sessionUser.email || null;
   }
 
+  type ThemeMode = "system" | "light" | "dark";
+  let themeMode = $state<ThemeMode>("system");
+
+  function applyTheme(mode: ThemeMode) {
+    themeMode = mode;
+    localStorage.setItem("jc-theme", mode);
+    if (mode === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else if (mode === "light") {
+      document.documentElement.setAttribute("data-theme", "light");
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+  }
+
+  function cycleTheme() {
+    if (themeMode === "system") {
+      applyTheme("light");
+    } else if (themeMode === "light") {
+      applyTheme("dark");
+    } else {
+      applyTheme("system");
+    }
+  }
+
   onMount(() => {
+    const saved = localStorage.getItem("jc-theme") as ThemeMode | null;
+    if (saved === "light" || saved === "dark" || saved === "system") {
+      applyTheme(saved);
+    } else {
+      applyTheme("system");
+    }
+
     pingHealth();
     timer = setInterval(pingHealth, 5000);
 
@@ -74,6 +106,26 @@
           <span class="user-name">{userName}</span>
         </div>
       {/if}
+
+      <!-- Theme Switcher Button -->
+      <button
+        class="theme-toggle-btn"
+        onclick={cycleTheme}
+        title={`Theme mode: ${themeMode.toUpperCase()} (Click to switch between Auto, Light, and Dark)`}
+        aria-label="Toggle color theme"
+      >
+        {#if themeMode === "system"}
+          <span class="theme-icon">💻</span>
+          <span class="theme-text">Auto</span>
+        {:else if themeMode === "light"}
+          <span class="theme-icon">☀️</span>
+          <span class="theme-text">Light</span>
+        {:else}
+          <span class="theme-icon">🌙</span>
+          <span class="theme-text">Dark</span>
+        {/if}
+      </button>
+
       <div class="indicator-group" title={isHealthy === null ? "Checking backend..." : isHealthy ? "Backend connected" : "Backend unreachable"}>
         <span
           class="status-dot"
@@ -102,13 +154,14 @@
     left: 0;
     right: 0;
     height: 44px;
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--status-bar-bg);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border-color);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
   }
 
   .status-inner {
@@ -138,7 +191,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    background: #f1f5f9;
+    background: var(--card-bg-subtle);
     color: var(--text-main);
     padding: 0.2rem 0.6rem;
     border-radius: 9999px;
@@ -149,6 +202,35 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .theme-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: var(--card-bg-subtle);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.775rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .theme-toggle-btn:hover {
+    background: var(--input-bg);
+    border-color: var(--primary-color);
+  }
+
+  .theme-icon {
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  .theme-text {
+    font-size: 0.75rem;
   }
 
   .user-icon {
