@@ -65,8 +65,9 @@
 
   .status-inner {
     width: 100%;
-    max-width: 480px;
-    padding: 0 1.25rem;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 clamp(0.75rem, 3vw, 2rem);
     display: flex;
     justify-content: space-between;
     align-items: center;

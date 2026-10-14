@@ -152,7 +152,7 @@
         <table class="users-table">
           <thead>
             <tr>
-              <th>#</th>
+              <th class="col-num">#</th>
               <th>Full Name (Click to Login)</th>
               <th>Email</th>
               <th>Roles</th>
@@ -205,9 +205,9 @@
 <style>
   .users-container {
     width: 100%;
-    max-width: 100%;
-    margin: 1rem 0;
-    padding: 0 1.5rem;
+    max-width: 1280px;
+    margin: 1.25rem auto;
+    padding: 0 clamp(0.75rem, 3vw, 2rem);
     box-sizing: border-box;
   }
 
@@ -216,13 +216,13 @@
     border: 2px solid #ef4444;
     color: #991b1b;
     font-weight: 800;
-    font-size: 1.15rem;
-    letter-spacing: 0.05em;
+    font-size: clamp(0.95rem, 2.5vw, 1.2rem);
+    letter-spacing: 0.06em;
     text-align: center;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
+    padding: 0.85rem 1.25rem;
+    border-radius: 0.75rem;
     margin-bottom: 1.25rem;
-    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.15);
+    box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.12), 0 2px 4px -2px rgba(239, 68, 68, 0.08);
   }
 
   .header-nav {
@@ -230,27 +230,35 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
+    gap: 0.75rem;
   }
 
   .nav-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     color: var(--primary-color);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: 600;
     font-size: 0.95rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.15s;
   }
 
   .nav-back:hover {
-    text-decoration: underline;
+    background-color: #f0fdfa;
+    text-decoration: none;
   }
 
   .badge-secret {
     background: #f1f5f9;
-    color: #64748b;
+    color: #475569;
     border: 1px solid #cbd5e1;
     border-radius: 9999px;
-    font-size: 0.75rem;
-    padding: 0.2rem 0.6rem;
-    font-family: monospace;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-weight: 600;
   }
 
@@ -262,7 +270,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
@@ -277,6 +286,7 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
+    flex-shrink: 0;
   }
 
   .session-indicator.active {
@@ -296,22 +306,24 @@
     background: transparent;
     border: 1px solid #ef4444;
     color: #ef4444;
-    padding: 0.35rem 0.8rem;
-    border-radius: 0.375rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 0.5rem;
     font-size: 0.85rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
+    transition: all 0.15s ease;
   }
 
   .btn-logout:hover {
     background: #fef2f2;
+    border-color: #dc2626;
   }
 
   .alert {
-    padding: 0.75rem 1rem;
+    padding: 0.85rem 1.25rem;
     border-radius: 0.5rem;
-    font-size: 0.9rem;
-    margin-bottom: 1rem;
+    font-size: 0.925rem;
+    margin-bottom: 1.25rem;
   }
 
   .alert-success {
@@ -330,7 +342,7 @@
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 0.75rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
     overflow: hidden;
   }
 
@@ -340,129 +352,155 @@
     align-items: center;
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
+    background: #fafafa;
   }
 
   .table-header h2 {
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-size: clamp(1.1rem, 2vw, 1.3rem);
+    font-weight: 700;
     margin: 0;
     color: var(--text-main);
   }
 
   .btn-refresh {
-    background: transparent;
+    background: #ffffff;
     border: 1px solid var(--border-color);
-    border-radius: 0.375rem;
-    padding: 0.3rem 0.7rem;
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.85rem;
     font-size: 0.85rem;
+    font-weight: 500;
     cursor: pointer;
     color: var(--text-muted);
+    transition: all 0.15s ease;
   }
 
   .btn-refresh:hover {
     background: #f8fafc;
     color: var(--text-main);
+    border-color: #cbd5e1;
   }
 
   .table-loading {
-    padding: 2rem;
+    padding: 3rem 1.5rem;
     text-align: center;
     color: var(--text-muted);
+    font-size: 1rem;
   }
 
   .table-wrapper {
+    width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .users-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     text-align: left;
-    font-size: 0.9rem;
+    font-size: 0.925rem;
   }
 
   .users-table th {
     background: #f8fafc;
     color: #475569;
-    font-weight: 600;
-    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.875rem 1rem;
     border-bottom: 1px solid var(--border-color);
     white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 5;
   }
 
   .users-table td {
-    padding: 0.75rem 1rem;
+    padding: 0.875rem 1rem;
     border-bottom: 1px solid var(--border-color);
     vertical-align: middle;
+    transition: background-color 0.15s ease;
   }
 
   .users-table tr:last-child td {
     border-bottom: none;
   }
 
-  .users-table tr:hover {
+  .users-table tr:hover td {
     background-color: #f8fafc;
   }
 
-  .users-table tr.current-user {
+  .users-table tr.current-user td {
     background-color: #f0fdf4;
+  }
+
+  .users-table tr.current-user td:first-child {
+    border-left: 3px solid #10b981;
   }
 
   .col-num {
     color: #94a3b8;
-    width: 30px;
-    font-size: 0.8rem;
+    width: 44px;
+    font-size: 0.825rem;
+    font-variant-numeric: tabular-nums;
   }
 
   .btn-login-user {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    background: transparent;
-    border: none;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
+    gap: 0.5rem;
+    background: #f0fdfa;
+    border: 1px solid #ccfbf1;
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.5rem;
     cursor: pointer;
     font-weight: 600;
     color: var(--primary-color);
     text-align: left;
-    transition: background 0.15s, color 0.15s;
+    font-size: 0.925rem;
+    transition: all 0.15s ease;
   }
 
-  .btn-login-user:hover {
-    background: #e0f2fe;
-    color: #0369a1;
+  .btn-login-user:hover:not(:disabled) {
+    background: #ccfbf1;
+    border-color: #99f6e4;
+    color: #0f766e;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(13, 148, 136, 0.12);
   }
 
   .user-arrow {
-    opacity: 0;
-    transition: opacity 0.15s, transform 0.15s;
-    font-size: 0.75rem;
+    opacity: 0.6;
+    transition: transform 0.15s, opacity 0.15s;
+    font-size: 0.8rem;
   }
 
   .btn-login-user:hover .user-arrow {
     opacity: 1;
-    transform: translateX(2px);
+    transform: translateX(3px);
   }
 
   .col-email {
-    font-family: monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     color: #64748b;
-    font-size: 0.85rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
   }
 
   .roles-wrap {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem;
+    gap: 0.4rem;
   }
 
   .role-badge {
     display: inline-block;
-    padding: 0.2rem 0.55rem;
+    padding: 0.25rem 0.65rem;
     border-radius: 9999px;
     font-size: 0.75rem;
     font-weight: 600;
+    letter-spacing: 0.02em;
     text-transform: capitalize;
   }
 
@@ -488,12 +526,62 @@
     background: #10b981;
     color: #ffffff;
     font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.2rem 0.5rem;
-    border-radius: 0.25rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .badge-active::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ffffff;
+    display: inline-block;
   }
 
   .badge-idle {
     color: #cbd5e1;
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 640px) {
+    .users-container {
+      padding: 0 0.75rem;
+    }
+
+    .session-card {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .btn-logout {
+      width: 100%;
+      text-align: center;
+    }
+
+    .col-num {
+      display: none;
+    }
+
+    .users-table th,
+    .users-table td {
+      padding: 0.65rem 0.75rem;
+      font-size: 0.85rem;
+    }
+
+    .btn-login-user {
+      padding: 0.35rem 0.55rem;
+      font-size: 0.85rem;
+    }
+
+    .col-email {
+      font-size: 0.8rem;
+    }
   }
 </style>
