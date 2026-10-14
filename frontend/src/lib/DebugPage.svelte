@@ -32,24 +32,45 @@
   let successMsg = $state<string | null>(null);
   let dataSource = $state<"backend" | "fallback" | "loading">("loading");
 
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/+$/, "");
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+
   async function loadUsers() {
     loading = true;
     errorMsg = null;
     try {
+      // 1. Call the proper /debug REST endpoint handler (Edge Function)
+      const debugUrl = `${supabaseUrl}/functions/v1/debug`;
+      const res = await fetch(debugUrl, {
+        method: "GET",
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.users && Array.isArray(json.users) && json.users.length > 0) {
+          users = json.users;
+          dataSource = "backend";
+          return;
+        }
+      }
+
+      // 2. Direct fallback to profiles table (with RLS disabled)
       const { data, error } = await supabase
         .from("profiles")
         .select("id, email, full_name, roles, created_at")
         .order("email");
 
-      if (error) {
-        errorMsg = `Backend fetch failed (${error.code}: ${error.message}). Showing local fallback data. Hint: apply migrations with GRANT SELECT privileges.`;
-        users = DEMO_FALLBACK;
-        dataSource = "fallback";
-      } else if (data && data.length > 0) {
+      if (!error && data && data.length > 0) {
         users = data;
         dataSource = "backend";
       } else {
-        errorMsg = "Backend returned 0 users. Showing demo fallback data. Run './jctool db-demo' to seed users.";
+        errorMsg = error
+          ? `Backend query failed (${error.code}: ${error.message}). Showing local fallback data.`
+          : `Debug endpoint (${debugUrl}) returned HTTP ${res.status}. Showing local fallback data.`;
         users = DEMO_FALLBACK;
         dataSource = "fallback";
       }

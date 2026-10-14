@@ -658,6 +658,38 @@ def cmd_db_demo(passphrase: str = "") -> None:
     print("\nSummary: 1 superuser, 3 managers, 9 riders across 10 users.")
 
 
+def cmd_func_deploy(passphrase: str = "") -> None:
+    """Deploy Supabase Edge Functions (e.g. ./jctool func-deploy [function-name])."""
+    ensure_cached_path()
+    sb_exe = BIN_DIR / "supabase"
+    if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
+        print_err("Supabase CLI not found. Run './jctool install' first.")
+        sys.exit(1)
+
+    config = load_config(enforce_encrypted=True)
+    sb_cfg = config.get("secrets", {}).get("supabase", {})
+    enc_url = sb_cfg.get("url", "")
+    if not passphrase:
+        passphrase = prompt_passphrase("Enter passphrase to decrypt config: ")
+
+    url = decrypt_value(enc_url, passphrase)
+    project_ref = url.replace("https://", "").split(".")[0]
+
+    enc_token = sb_cfg.get("access_token", "")
+    env = os.environ.copy()
+    if enc_token:
+        env["SUPABASE_ACCESS_TOKEN"] = decrypt_value(enc_token, passphrase)
+
+    fn_name = sys.argv[2] if len(sys.argv) > 2 else "debug"
+    print_header(f"Deploying Edge Function: {fn_name} (Project: {project_ref})")
+    cmd = [str(sb_exe), "functions", "deploy", fn_name, "--project-ref", project_ref, "--no-verify-jwt"]
+    res = subprocess.run(cmd, env=env, check=False)
+    if res.returncode != 0:
+        print_err(f"Function deploy failed for {fn_name}.")
+        sys.exit(res.returncode)
+    print_ok(f"Function '{fn_name}' deployed successfully!")
+
+
 def cmd_publish() -> None:
     """Publish both backend (migrate) and frontend (gh-pages)."""
     print_header("junta-cycle tool (jctool publish)")
@@ -687,6 +719,7 @@ def show_help() -> None:
     print("  db-demo     Populate database with 10 demo users (Aarav to Jaya, 1 super, 3 mgr, 9 rider)")
     print("  db-new      Create a new timestamped migration file in supabase/migrations/")
     print("  db-query    Run query or SQL file (e.g. ./jctool db-query 'SELECT 1;' or -f file.sql)")
+    print("  func-deploy Deploy Edge Function (e.g. ./jctool func-deploy debug)")
     print("  help        Show this help message")
 
 
@@ -704,6 +737,7 @@ def main() -> None:
         "db-demo": cmd_db_demo,
         "db-new": cmd_db_new,
         "db-query": cmd_db_query,
+        "func-deploy": cmd_func_deploy,
         "help": show_help,
         "--help": show_help,
         "-h": show_help,

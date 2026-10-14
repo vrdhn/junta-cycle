@@ -19,8 +19,9 @@
 
 ## Architecture & Technology Decisions
 - **Framework**: Svelte with TypeScript.
-- **Styling**: Minimal CSS, mobile-friendly / responsive.
-- **Backend**: Supabase (free tier).
+- **Backend Handlers**: TypeScript serverless handlers (Edge Functions) for business logic (QR codes, lock combinations, debug endpoints).
+- **Database**: PostgreSQL (Supabase free tier) - strictly used as a lean relational store; no RLS, minimal SQL triggers.
+- **Styling**: Minimal CSS, responsive across wide desktop screens and mobile devices.
 - **Hosting**: GitHub Pages.
 - **Approach**: Minimal starting scope; defer complex billing, geofencing, and advanced flows.
 
@@ -42,6 +43,7 @@
 ## Directory Structure
 - `frontend/`: Svelte + TypeScript + Vite web app (landing page, mobile-friendly styles).
 - `supabase/`:
+  - `supabase/functions/`: TypeScript backend handlers (e.g. `supabase/functions/debug/index.ts`).
   - `supabase/migrations/`: Timestamped `.sql` migration files (e.g., `20261014000000_roles_and_profiles.sql`).
   - `supabase/seed.sql`: Demo dataset with 10 Indian-named users in alphabetical order (A through J).
 
@@ -58,11 +60,10 @@
 - **Migrations Engine**: Supabase CLI native migration engine (`supabase db push`, `supabase migration list`).
 - **Transactional Rollback**: Each migration file executes in an atomic transaction; on failure, all changes in that file are rolled back.
 - **Tracking Table**: `supabase_migrations.schema_migrations` maintained automatically by Supabase.
+- **No RLS**: Row Level Security is disabled; security and business rules are enforced in TypeScript backend handlers.
 - **`public.allowed_roles`**: Table storing allowed roles (`rider`, `manager`, `superuser`).
 - **`public.profiles`**: 1-to-1 extension of `auth.users`, storing `email`, `full_name`, and `roles text[]`.
-- **Integrity**: `validate_roles()` check constraint ensures all elements in `profiles.roles` exist in `allowed_roles`.
-- **Authorization**: `public.has_role(check_role)` helper function enables fast RLS checks (superuser automatically matches).
-- **Trigger**: `on_auth_user_created` trigger automatically provisions a `profiles` entry with `roles = array['rider']` on signup.
+- **Trigger**: Minimal `on_auth_user_created` trigger provisions an initial `profiles` row on user signup.
 - **Demo Users**: 10 users with password `junta123`:
   - `aarav@junta.cycle` (Aarav Patel): superuser (1 superuser)
   - `bhavna@junta.cycle` (Bhavna Sharma): manager, rider
