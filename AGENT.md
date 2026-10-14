@@ -33,6 +33,7 @@
   - `./jctool dev`: Launches Vite dev server for local frontend testing.
   - `./jctool db-migrate`: Applies pending migrations to Supabase transactionally with automatic rollback using `supabase db push`.
   - `./jctool db-status`: Displays migration status (local vs remote) using `supabase migration list`.
+  - `./jctool db-demo`: Populates database with 10 demo users (Indian names, 1 superuser, 3 managers, 9 riders, password `junta123`).
   - `./jctool db-new <name>`: Generates a new timestamped migration file in `supabase/migrations/`.
   - `./jctool db-query`: Executes SQL queries or files against Supabase (e.g. `./jctool db-query 'SELECT 1;'`).
   - `./jctool publish`: Runs `db-migrate` first; if successful, builds and publishes frontend to `gh-pages`.
@@ -42,6 +43,7 @@
 - `frontend/`: Svelte + TypeScript + Vite web app (landing page, mobile-friendly styles).
 - `supabase/`:
   - `supabase/migrations/`: Timestamped `.sql` migration files (e.g., `20261014000000_roles_and_profiles.sql`).
+  - `supabase/seed.sql`: Demo dataset with 10 Indian-named users in alphabetical order (A through J).
 
 ## Configuration & Secrets Management
 - File: `config.json`
@@ -61,12 +63,23 @@
 - **Integrity**: `validate_roles()` check constraint ensures all elements in `profiles.roles` exist in `allowed_roles`.
 - **Authorization**: `public.has_role(check_role)` helper function enables fast RLS checks (superuser automatically matches).
 - **Trigger**: `on_auth_user_created` trigger automatically provisions a `profiles` entry with `roles = array['rider']` on signup.
+- **Demo Users**: 10 users with password `junta123`:
+  - `aarav@junta.cycle` (Aarav Patel): superuser (1 superuser)
+  - `bhavna@junta.cycle` (Bhavna Sharma): manager, rider
+  - `chirag@junta.cycle` (Chirag Gupta): manager, rider
+  - `divya@junta.cycle` (Divya Nair): manager, rider (total 3 managers)
+  - `eshan@junta.cycle` (Eshan Reddy): rider
+  - `fatima@junta.cycle` (Fatima Khan): rider
+  - `gopal@junta.cycle` (Gopal Krishnan): rider
+  - `hema@junta.cycle` (Hema Sundaram): rider
+  - `ishan@junta.cycle` (Ishan Joshi): rider
+  - `jaya@junta.cycle` (Jaya Verma): rider (total 9 riders across 10 users)
 
 ## Current Status & Next Steps
-- Standardized on Supabase CLI's transactional migration engine with `supabase/migrations/20261014000000_roles_and_profiles.sql`.
-- Ready to apply migration using `./jctool db-migrate`.
-- Next: Wire up Supabase Auth login with pre-configured test users.
-- Next: Wire up Supabase Auth login with pre-configured test users.
+- Created `supabase/seed.sql` and `./jctool db-demo` command.
+- Migrations ready to run via `./jctool db-migrate`.
+- Demo users ready to populate via `./jctool db-demo`.
+- Next: Wire up frontend 1-click login picker for demo users.
 
 
 
