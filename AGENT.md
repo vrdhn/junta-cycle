@@ -77,10 +77,11 @@
 
 ## Current Status & Next Steps
 - Created `supabase/seed.sql` and `./jctool db-demo` command.
-- Created secret `/users` route (`frontend/src/lib/UsersTable.svelte`) displaying all users, roles badges, and 1-click login.
-- Configured SPA routing in `jctool build` (generating `404.html` and `users/index.html` for GitHub Pages).
-- Ready to apply migration using `./jctool db-migrate` and seed users with `./jctool db-demo`.
-- Next: Publish updated frontend using `./jctool publish`.
+- Created `/debug` route (`frontend/src/lib/DebugPage.svelte`) with prominent bold `<DEBUG PAGE, NOT FOR PRODUCTION>` banner.
+- Profiles contain no description (only `id, email, full_name, roles`).
+- Dynamic table displaying users, role badges, and 1-click login.
+- Configured SPA routing in `jctool build` (generating `404.html`, `debug/index.html`, and `users/index.html` for GitHub Pages).
+- Ready to apply migration (`./jctool db-migrate`), seed demo users (`./jctool db-demo`), and publish (`./jctool publish`).
 
 
 

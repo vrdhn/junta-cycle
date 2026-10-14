@@ -105,9 +105,13 @@
 </script>
 
 <div class="users-container">
+  <div class="debug-banner">
+    &lt;DEBUG PAGE, NOT FOR PRODUCTION&gt;
+  </div>
+
   <div class="header-nav">
     <a href="./" class="nav-back">← Back to Home</a>
-    <span class="badge-secret">Secret /users route</span>
+    <span class="badge-secret">/debug</span>
   </div>
 
   <div class="session-card">
@@ -207,6 +211,20 @@
     box-sizing: border-box;
   }
 
+  .debug-banner {
+    background: #fee2e2;
+    border: 2px solid #ef4444;
+    color: #991b1b;
+    font-weight: 800;
+    font-size: 1.15rem;
+    letter-spacing: 0.05em;
+    text-align: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.15);
+  }
+
   .header-nav {
     display: flex;
     justify-content: space-between;
@@ -233,6 +251,7 @@
     font-size: 0.75rem;
     padding: 0.2rem 0.6rem;
     font-family: monospace;
+    font-weight: 600;
   }
 
   .session-card {

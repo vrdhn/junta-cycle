@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import StatusBar from "./lib/StatusBar.svelte";
-  import UsersTable from "./lib/UsersTable.svelte";
+  import DebugPage from "./lib/DebugPage.svelte";
   import { supabase } from "./lib/supabase";
 
-  let currentRoute = $state<"home" | "users">("home");
+  let currentRoute = $state<"home" | "debug">("home");
   let activeUser = $state<any>(null);
 
   function checkRoute() {
@@ -13,25 +13,28 @@
     const search = window.location.search;
 
     if (
+      path.endsWith("/debug") ||
       path.endsWith("/users") ||
+      hash === "#debug" ||
+      hash === "#/debug" ||
       hash === "#users" ||
       hash === "#/users" ||
-      search.includes("page=users") ||
+      search.includes("debug") ||
       search.includes("users")
     ) {
-      currentRoute = "users";
+      currentRoute = "debug";
     } else {
       currentRoute = "home";
     }
   }
 
-  function navigateTo(route: "home" | "users") {
-    if (route === "users") {
-      window.location.hash = "users";
+  function navigateTo(route: "home" | "debug") {
+    if (route === "debug") {
+      window.location.hash = "debug";
     } else {
       window.location.hash = "";
-      if (window.location.pathname.endsWith("/users")) {
-        window.history.pushState({}, "", window.location.pathname.replace(/\/users$/, "/") || "./");
+      if (window.location.pathname.endsWith("/debug") || window.location.pathname.endsWith("/users")) {
+        window.history.pushState({}, "", window.location.pathname.replace(/\/(?:debug|users)$/, "/") || "./");
       }
     }
     checkRoute();
@@ -68,8 +71,8 @@
 
 <StatusBar />
 
-{#if currentRoute === "users"}
-  <UsersTable />
+{#if currentRoute === "debug"}
+  <DebugPage />
 {:else}
   <main class="welcome-container">
     <div class="hero-card">
@@ -87,12 +90,12 @@
 
       <div class="action-section">
         {#if !activeUser}
-          <button class="btn-primary" onclick={() => navigateTo("users")}>
-            Login / Select User
+          <button class="btn-primary" onclick={() => navigateTo("debug")}>
+            Login / Debug Users
           </button>
         {:else}
-          <button class="btn-secondary" onclick={() => navigateTo("users")}>
-            Switch User (/users)
+          <button class="btn-secondary" onclick={() => navigateTo("debug")}>
+            Switch User (/debug)
           </button>
         {/if}
       </div>

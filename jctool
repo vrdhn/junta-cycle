@@ -449,10 +449,11 @@ def cmd_build() -> None:
         if index_html.is_file():
             content = index_html.read_text(encoding="utf-8")
             (dist_dir / "404.html").write_text(content, encoding="utf-8")
-            users_dir = dist_dir / "users"
-            users_dir.mkdir(parents=True, exist_ok=True)
-            (users_dir / "index.html").write_text(content, encoding="utf-8")
-        print_ok("Frontend built successfully into frontend/dist (with SPA routing for /users)")
+            for sub in ("debug", "users"):
+                sub_dir = dist_dir / sub
+                sub_dir.mkdir(parents=True, exist_ok=True)
+                (sub_dir / "index.html").write_text(content, encoding="utf-8")
+        print_ok("Frontend built successfully into frontend/dist (with SPA routing for /debug and /users)")
     else:
         sys.exit(res.returncode)
 
