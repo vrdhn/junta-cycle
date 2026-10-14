@@ -31,7 +31,9 @@
   - `./jctool encrypt`: Encrypts plaintext strings under `"secrets"` in `config.json` with prefix `enc-v1:` using OpenSSL AES-256-CBC PBKDF2, and saves `password_check`.
   - `./jctool build`: Builds the Svelte frontend into `frontend/dist` using cached node/npm.
   - `./jctool dev`: Launches Vite dev server for local frontend testing.
-  - `./jctool publish`: Publishes both frontend (deploys to `gh-pages` branch) and backend (runs Supabase deployment/migration hook).
+  - `./jctool db-migrate`: Applies `backend/schema.sql` to the Supabase database.
+  - `./jctool db-query`: Executes SQL queries or files against Supabase (e.g. `./jctool db-query 'SELECT 1;'`).
+  - `./jctool publish`: Runs `db-migrate` first; if successful, builds and publishes frontend to `gh-pages`.
 
 
 ## Directory Structure

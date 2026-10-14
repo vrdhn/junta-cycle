@@ -13,8 +13,10 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import urllib.parse
 import urllib.request
 from pathlib import Path
+
 from typing import Any, Callable
 
 CACHE_DIR = Path.home() / ".cache" / "junta-cycle"
@@ -504,26 +506,87 @@ def publish_frontend() -> None:
         sys.exit(push_res.returncode)
 
 
-def publish_backend() -> None:
-    """Publish backend schema/migrations using Supabase CLI."""
+def get_db_url(passphrase: str = "") -> str:
+    """Retrieve direct PostgreSQL connection string using decrypted credentials."""
+    config = load_config(enforce_encrypted=True)
+    sb = config.get("secrets", {}).get("supabase", {})
+    enc_pwd = sb.get("database-password", "")
+    url = sb.get("url", "")
+
+    if not enc_pwd:
+        print_err("database-password missing in config.json")
+        sys.exit(1)
+
+    if not passphrase:
+        passphrase = prompt_passphrase("Enter passphrase to decrypt database credentials: ")
+        check_val = config.get("secrets", {}).get("password_check", "")
+        if check_val and not verify_password(check_val, passphrase):
+            print_err("Incorrect passphrase!")
+            sys.exit(1)
+
+    raw_pwd = decrypt_value(enc_pwd, passphrase)
+    encoded_pwd = urllib.parse.quote_plus(raw_pwd)
+
+    # Extract project ref from URL (e.g. https://<ref>.supabase.co)
+    project_ref = url.replace("https://", "").replace("http://", "").split(".")[0]
+    return f"postgresql://postgres:{encoded_pwd}@db.{project_ref}.supabase.co:5432/postgres"
+
+
+def cmd_db_query(passphrase: str = "") -> None:
+    """Execute a raw SQL query or file against Supabase database."""
     ensure_cached_path()
     sb_exe = BIN_DIR / "supabase"
     if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
-        print_warn("Supabase CLI not installed in cache. Run './jctool install'.")
-        return
+        print_err(f"Supabase CLI not found. Run './jctool install' first.")
+        sys.exit(1)
 
-    print("\nPublishing backend...")
+    db_url = get_db_url(passphrase)
+    args = sys.argv[2:] if len(sys.argv) > 2 else []
+    if not args:
+        print("Usage: ./jctool db-query <sql-query> OR ./jctool db-query -f <sql-file>")
+        sys.exit(1)
+
+    cmd = [str(sb_exe), "db", "query", "--db-url", db_url, *args]
+    res = subprocess.run(cmd, check=False)
+    if res.returncode != 0:
+        sys.exit(res.returncode)
+
+
+def cmd_db_migrate(passphrase: str = "") -> None:
+    """Apply backend/schema.sql and migrations to Supabase database."""
+    ensure_cached_path()
+    sb_exe = BIN_DIR / "supabase"
+    if not (sb_exe.is_file() and os.access(sb_exe, os.X_OK)):
+        print_err(f"Supabase CLI not found. Run './jctool install' first.")
+        sys.exit(1)
+
     schema_file = Path("backend/schema.sql")
-    if schema_file.is_file():
-        print_ok(f"Backend schema verified at {schema_file}")
-    print_ok("Backend deployment ready (migrations will be configured next)")
+    if not schema_file.is_file():
+        print_err(f"Schema file not found at {schema_file}")
+        sys.exit(1)
+
+    print(f"Applying database schema from {schema_file}...")
+    db_url = get_db_url(passphrase)
+    cmd = [str(sb_exe), "db", "query", "--db-url", db_url, "-f", str(schema_file)]
+    res = subprocess.run(cmd, check=False)
+    if res.returncode == 0:
+        print_ok("Database migration applied successfully!")
+    else:
+        print_err("Database migration failed!")
+        sys.exit(res.returncode)
 
 
 def cmd_publish() -> None:
-    """Publish both frontend and backend."""
-    publish_frontend()
-    publish_backend()
+    """Publish both backend (migrate) and frontend (gh-pages)."""
+    print_header("junta-cycle tool (jctool publish)")
+    # 1. Attempt database migration first
+    print("\n--- Step 1: Database Migration ---")
+    cmd_db_migrate()
 
+    # 2. If migration succeeds, publish frontend
+    print("\n--- Step 2: Frontend Publish ---")
+    publish_frontend()
+    print_ok("Full project publish completed successfully!")
 
 
 def show_help() -> None:
@@ -531,13 +594,15 @@ def show_help() -> None:
     print_header("junta-cycle tool (jctool)")
     print("Usage: ./jctool <command>\n")
     print("Commands:")
-    print("  install  Install Node.js & npm into ~/.cache/junta-cycle")
-    print("  check    Verify required tools and credentials (Node, Git/GitHub, Supabase)")
-    print("  encrypt  Encrypt plaintext secrets in config.json (prefixed with enc-v1:)")
-    print("  build    Build the frontend app into frontend/dist")
-    print("  dev      Start local development server for frontend")
-    print("  publish  Build frontend and deploy directly to gh-pages branch")
-    print("  help     Show this help message")
+    print("  install     Install Node.js, npm & Supabase CLI into ~/.cache/junta-cycle")
+    print("  check       Verify required tools and credentials (Node, Git/GitHub, Supabase)")
+    print("  encrypt     Encrypt plaintext secrets in config.json (prefixed with enc-v1:)")
+    print("  build       Build the frontend app into frontend/dist")
+    print("  dev         Start local development server for frontend")
+    print("  publish     Publish project (runs db-migrate first, then deploys to gh-pages)")
+    print("  db-migrate  Apply backend/schema.sql to Supabase database")
+    print("  db-query    Run query or SQL file (e.g. ./jctool db-query 'SELECT 1;' or -f file.sql)")
+    print("  help        Show this help message")
 
 
 def main() -> None:
@@ -549,6 +614,8 @@ def main() -> None:
         "build": cmd_build,
         "dev": cmd_dev,
         "publish": cmd_publish,
+        "db-migrate": cmd_db_migrate,
+        "db-query": cmd_db_query,
         "help": show_help,
         "--help": show_help,
         "-h": show_help,
@@ -561,6 +628,7 @@ def main() -> None:
         print(f"Unknown command: {cmd}\n")
         show_help()
         sys.exit(1)
+
 
 
 
