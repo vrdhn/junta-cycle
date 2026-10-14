@@ -10,27 +10,12 @@
     created_at?: string;
   }
 
-  // Predefined demo fallback in case database is empty or offline
-  const DEMO_FALLBACK: Profile[] = [
-    { id: "1", email: "aarav@junta.cycle", full_name: "Aarav Patel", roles: ["superuser"] },
-    { id: "2", email: "bhavna@junta.cycle", full_name: "Bhavna Sharma", roles: ["manager", "rider"] },
-    { id: "3", email: "chirag@junta.cycle", full_name: "Chirag Gupta", roles: ["manager", "rider"] },
-    { id: "4", email: "divya@junta.cycle", full_name: "Divya Nair", roles: ["manager", "rider"] },
-    { id: "5", email: "eshan@junta.cycle", full_name: "Eshan Reddy", roles: ["rider"] },
-    { id: "6", email: "fatima@junta.cycle", full_name: "Fatima Khan", roles: ["rider"] },
-    { id: "7", email: "gopal@junta.cycle", full_name: "Gopal Krishnan", roles: ["rider"] },
-    { id: "8", email: "hema@junta.cycle", full_name: "Hema Sundaram", roles: ["rider"] },
-    { id: "9", email: "ishan@junta.cycle", full_name: "Ishan Joshi", roles: ["rider"] },
-    { id: "10", email: "jaya@junta.cycle", full_name: "Jaya Verma", roles: ["rider"] },
-  ];
-
   let users = $state<Profile[]>([]);
   let loading = $state(true);
   let errorMsg = $state<string | null>(null);
   let activeUserEmail = $state<string | null>(null);
   let loggingInEmail = $state<string | null>(null);
   let successMsg = $state<string | null>(null);
-  let dataSource = $state<"backend" | "fallback" | "loading">("loading");
 
   const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/+$/, "");
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
@@ -38,8 +23,9 @@
   async function loadUsers() {
     loading = true;
     errorMsg = null;
+    users = [];
+
     try {
-      // 1. Call the proper /debug REST endpoint handler (Edge Function)
       const debugUrl = `${supabaseUrl}/functions/v1/debug`;
       const res = await fetch(debugUrl, {
         method: "GET",
@@ -49,35 +35,27 @@
         },
       });
 
-      if (res.ok) {
-        const json = await res.json();
-        if (json.users && Array.isArray(json.users) && json.users.length > 0) {
-          users = json.users;
-          dataSource = "backend";
-          return;
+      if (!res.ok) {
+        const text = await res.text();
+        let parsedMessage = text;
+        try {
+          const errObj = JSON.parse(text);
+          parsedMessage = errObj.error || errObj.message || text;
+        } catch {
+          // raw text
         }
+        errorMsg = `Endpoint ${debugUrl} failed (HTTP ${res.status}): ${parsedMessage}`;
+        return;
       }
 
-      // 2. Direct fallback to profiles table (with RLS disabled)
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, roles, created_at")
-        .order("email");
-
-      if (!error && data && data.length > 0) {
-        users = data;
-        dataSource = "backend";
+      const json = await res.json();
+      if (json.users && Array.isArray(json.users)) {
+        users = json.users;
       } else {
-        errorMsg = error
-          ? `Backend query failed (${error.code}: ${error.message}). Showing local fallback data.`
-          : `Debug endpoint (${debugUrl}) returned HTTP ${res.status}. Showing local fallback data.`;
-        users = DEMO_FALLBACK;
-        dataSource = "fallback";
+        errorMsg = `Invalid response from ${debugUrl}: expected { users: [...] }`;
       }
     } catch (e: any) {
-      errorMsg = `Connection error: ${e.message || e}. Showing local fallback data.`;
-      users = DEMO_FALLBACK;
-      dataSource = "fallback";
+      errorMsg = `Network error calling ${supabaseUrl}/functions/v1/debug: ${e.message || e}`;
     } finally {
       loading = false;
     }
@@ -168,23 +146,23 @@
     <div class="table-header">
       <div class="table-title-group">
         <h2>System Users &amp; Roles</h2>
-        {#if dataSource === "backend"}
-          <span class="badge-source live" title="Successfully queried from Supabase profiles table">
-            ● Live from Supabase
-          </span>
-        {:else if dataSource === "fallback"}
-          <span class="badge-source fallback" title="Showing local fallback data because database query failed or returned 0 rows">
-            ⚠ Local Fallback
-          </span>
-        {/if}
+        <span class="badge-endpoint">GET /functions/v1/debug</span>
       </div>
-      <button class="btn-refresh" onclick={loadUsers} title="Refresh users from database">
+      <button class="btn-refresh" onclick={loadUsers} title="Refresh users from backend">
         ↻ Refresh
       </button>
     </div>
 
     {#if loading}
-      <div class="table-loading">Loading users...</div>
+      <div class="table-loading">Calling /debug REST endpoint...</div>
+    {:else if users.length === 0}
+      <div class="table-empty">
+        {#if errorMsg}
+          No users loaded due to endpoint error.
+        {:else}
+          No users found in database. Run <code>./jctool db-demo</code> to seed users.
+        {/if}
+      </div>
     {:else}
       <div class="table-wrapper">
         <table class="users-table">
@@ -402,24 +380,15 @@
     flex-wrap: wrap;
   }
 
-  .badge-source {
+  .badge-endpoint {
     font-size: 0.75rem;
     font-weight: 600;
     padding: 0.2rem 0.65rem;
     border-radius: 9999px;
-    letter-spacing: 0.02em;
-  }
-
-  .badge-source.live {
-    background: #ecfdf5;
-    color: #065f46;
-    border: 1px solid #a7f3d0;
-  }
-
-  .badge-source.fallback {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 
   .table-header h2 {
@@ -447,7 +416,8 @@
     border-color: #cbd5e1;
   }
 
-  .table-loading {
+  .table-loading,
+  .table-empty {
     padding: 3rem 1.5rem;
     text-align: center;
     color: var(--text-muted);
