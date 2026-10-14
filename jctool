@@ -286,8 +286,15 @@ def check_supabase() -> None:
             print_ok("Supabase Anon Key configured (encrypted)")
         else:
             print_err("Supabase Anon Key missing in config.json")
+
+        db_pwd = sb.get("database-password", "")
+        if db_pwd:
+            print_ok("Supabase Database Password configured (encrypted)")
+        else:
+            print_warn("Supabase Database Password missing in config.json")
     except Exception as err:
         print_err(f"Error reading {CONFIG_FILE}: {err}")
+
 
 
 def cmd_install() -> None:

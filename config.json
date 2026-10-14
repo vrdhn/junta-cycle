@@ -1,9 +1,10 @@
 {
   "secrets": {
-    "password_check": "",
+    "password_check": "enc-v1:U2FsdGVkX1926PQHTuYR/JjmP2rxCJvjB50YEjU9yZQ=",
     "supabase": {
-      "url": "",
-      "anon_key": ""
+      "url": "enc-v1:U2FsdGVkX198PlFYKM4UB7dQqDv8xudLXsO0krfbo3I=",
+      "anon_key": "enc-v1:U2FsdGVkX1/qkFiQ9uVDMJsa99P/9H7OahjaoUsFCIM=",
+      "database-password": "enc-v1:U2FsdGVkX19zIxyjkgbeZGgm62NdfZCeB5eohWDLJoi0gSTRQnrDwqX60FltMf1y"
     }
   }
 }
