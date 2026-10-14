@@ -49,12 +49,18 @@
 - Encryption scheme: OpenSSL AES-256-CBC, PBKDF2 with 100,000 iterations and salt.
 - Encrypted format: `enc-v1:<base64-ciphertext>`
 
+## Database Architecture
+- **`public.allowed_roles`**: Table storing allowed roles (`rider`, `manager`, `superuser`).
+- **`public.profiles`**: 1-to-1 extension of `auth.users`, storing `email`, `full_name`, and `roles text[]`.
+- **Integrity**: `validate_roles()` check constraint ensures all elements in `profiles.roles` exist in `allowed_roles`.
+- **Authorization**: `public.has_role(check_role)` helper function enables fast RLS checks (superuser automatically matches).
+- **Trigger**: `on_auth_user_created` trigger automatically provisions a `profiles` entry with `roles = array['rider']` on signup.
+
 ## Current Status & Next Steps
-- Frontend created in `frontend/` with landing page (`frontend/src/App.svelte`).
-- Added fixed top status bar (`frontend/src/lib/StatusBar.svelte`) checking Supabase Auth health (`/auth/v1/health`) every 5 seconds (green dot = Online, red dot = Offline).
-- Supabase CLI installed in `~/.cache/junta-cycle/bin/supabase` (v2.120.0).
-- `./jctool publish` configured to publish both frontend and backend.
-- Next: Wire up Supabase Auth to the Login button on the landing page.
+- Defined user roles, profiles, validation constraint, and signup trigger in `backend/schema.sql`.
+- Ready to apply migration using `./jctool db-migrate`.
+- Next: Wire up Supabase Auth login with pre-configured test users.
+
 
 
 
