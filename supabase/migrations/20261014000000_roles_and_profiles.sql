@@ -90,3 +90,8 @@ drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
   on public.profiles for update
   using (auth.uid() = id);
+
+-- 7. Grant access to PostgREST roles (anon, authenticated)
+grant usage on schema public to anon, authenticated;
+grant select on public.allowed_roles to anon, authenticated;
+grant select, update on public.profiles to anon, authenticated;

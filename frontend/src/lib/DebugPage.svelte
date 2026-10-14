@@ -30,6 +30,7 @@
   let activeUserEmail = $state<string | null>(null);
   let loggingInEmail = $state<string | null>(null);
   let successMsg = $state<string | null>(null);
+  let dataSource = $state<"backend" | "fallback" | "loading">("loading");
 
   async function loadUsers() {
     loading = true;
@@ -41,16 +42,21 @@
         .order("email");
 
       if (error) {
-        console.warn("Could not fetch remote profiles, using fallback list:", error.message);
+        errorMsg = `Backend fetch failed (${error.code}: ${error.message}). Showing local fallback data. Hint: apply migrations with GRANT SELECT privileges.`;
         users = DEMO_FALLBACK;
+        dataSource = "fallback";
       } else if (data && data.length > 0) {
         users = data;
+        dataSource = "backend";
       } else {
+        errorMsg = "Backend returned 0 users. Showing demo fallback data. Run './jctool db-demo' to seed users.";
         users = DEMO_FALLBACK;
+        dataSource = "fallback";
       }
     } catch (e: any) {
-      console.warn("Error fetching profiles:", e);
+      errorMsg = `Connection error: ${e.message || e}. Showing local fallback data.`;
       users = DEMO_FALLBACK;
+      dataSource = "fallback";
     } finally {
       loading = false;
     }
@@ -139,7 +145,18 @@
 
   <div class="table-card">
     <div class="table-header">
-      <h2>System Users &amp; Roles</h2>
+      <div class="table-title-group">
+        <h2>System Users &amp; Roles</h2>
+        {#if dataSource === "backend"}
+          <span class="badge-source live" title="Successfully queried from Supabase profiles table">
+            ● Live from Supabase
+          </span>
+        {:else if dataSource === "fallback"}
+          <span class="badge-source fallback" title="Showing local fallback data because database query failed or returned 0 rows">
+            ⚠ Local Fallback
+          </span>
+        {/if}
+      </div>
       <button class="btn-refresh" onclick={loadUsers} title="Refresh users from database">
         ↻ Refresh
       </button>
@@ -353,6 +370,35 @@
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
     background: #fafafa;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .table-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .badge-source {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.65rem;
+    border-radius: 9999px;
+    letter-spacing: 0.02em;
+  }
+
+  .badge-source.live {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+  }
+
+  .badge-source.fallback {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
   }
 
   .table-header h2 {
