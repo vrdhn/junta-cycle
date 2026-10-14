@@ -8,6 +8,7 @@ import getpass
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,7 @@ NODE_BIN_DIR = NODE_DIR / "bin"
 NODE_VERSION = "v22.11.0"
 CONFIG_FILE = Path("config.json")
 ENC_PREFIX = "enc-v1:"
+ENC_PATTERN = re.compile(r"^enc-v\d+:")
 
 # ANSI Colors
 GREEN = "\033[0;32m"
@@ -44,7 +46,27 @@ def print_warn(message: str) -> None:
 
 
 def print_err(message: str) -> None:
-    print(f"  [{RED}MISSING{RESET}] {message}")
+    print(f"  [{RED}ERROR{RESET}] {message}")
+
+
+def is_encrypted(value: str) -> bool:
+    """Check if a string has the enc-v*: prefix."""
+    return bool(ENC_PATTERN.match(value))
+
+
+def find_unencrypted_secrets(data: Any, path: str = "secrets") -> list[str]:
+    """Find any secrets values that are not encrypted."""
+    unencrypted = []
+    if isinstance(data, dict):
+        for k, v in data.items():
+            unencrypted.extend(find_unencrypted_secrets(v, f"{path}.{k}"))
+    elif isinstance(data, list):
+        for idx, item in enumerate(data):
+            unencrypted.extend(find_unencrypted_secrets(item, f"{path}[{idx}]"))
+    elif isinstance(data, str):
+        if not is_encrypted(data):
+            unencrypted.append(f"{path} ('{data[:10]}...' if long)")
+    return unencrypted
 
 
 def ensure_cached_path() -> None:
@@ -86,7 +108,7 @@ def openssl_cipher(args: list[str], input_str: str, passphrase: str) -> str:
 
 def encrypt_value(value: str, passphrase: str) -> str:
     """Encrypt a string if not already encrypted."""
-    if value.startswith(ENC_PREFIX) or not value:
+    if is_encrypted(value):
         return value
     args = ["-aes-256-cbc", "-pbkdf2", "-iter", "100000", "-salt", "-a", "-A"]
     cipher_b64 = openssl_cipher(args, value, passphrase)
@@ -94,12 +116,21 @@ def encrypt_value(value: str, passphrase: str) -> str:
 
 
 def decrypt_value(value: str, passphrase: str) -> str:
-    """Decrypt a string if it starts with ENC_PREFIX."""
-    if not value.startswith(ENC_PREFIX):
+    """Decrypt a string if it starts with enc-v*: prefix."""
+    if not is_encrypted(value):
         return value
-    payload = value[len(ENC_PREFIX) :]
+    payload = value.split(":", 1)[1]
     args = ["-d", "-aes-256-cbc", "-pbkdf2", "-iter", "100000", "-salt", "-a", "-A"]
     return openssl_cipher(args, payload, passphrase)
+
+
+def verify_password(check_val: str, passphrase: str) -> bool:
+    """Verify provided passphrase against stored self-encrypted check secret."""
+    try:
+        decrypted = decrypt_value(check_val, passphrase)
+        return decrypted == passphrase
+    except (ValueError, Exception):
+        return False
 
 
 def map_secrets(data: Any, fn: Callable[[str, str], str], passphrase: str) -> Any:
@@ -113,21 +144,6 @@ def map_secrets(data: Any, fn: Callable[[str, str], str], passphrase: str) -> An
     return data
 
 
-def load_config() -> dict[str, Any]:
-    """Load config.json or return default empty structure."""
-    if not CONFIG_FILE.is_file():
-        return {"secrets": {"supabase": {"url": "", "anon_key": ""}}}
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_config(data: dict[str, Any]) -> None:
-    """Save dictionary to config.json formatted with indents."""
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-        f.write("\n")
-
-
 def prompt_passphrase(prompt_text: str) -> str:
     """Prompt for passphrase from env, interactive tty, or stdin."""
     env_pass = os.environ.get("JC_PASSPHRASE")
@@ -139,9 +155,36 @@ def prompt_passphrase(prompt_text: str) -> str:
     return sys.stdin.readline().rstrip("\r\n")
 
 
+def load_config(enforce_encrypted: bool = True) -> dict[str, Any]:
+    """Load config.json and enforce all secrets are encrypted unless enforce_encrypted is False."""
+    if not CONFIG_FILE.is_file():
+        return {"secrets": {"password_check": "", "supabase": {"url": "", "anon_key": ""}}}
+
+    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    if enforce_encrypted and "secrets" in data:
+        unencrypted = find_unencrypted_secrets(data["secrets"])
+        if unencrypted:
+            print_err("Unencrypted secrets found in config.json:")
+            for item in unencrypted:
+                print(f"    - {item}")
+            print(f"\nAll secrets must be encrypted (prefix 'enc-v*:'). Run './jctool encrypt' first.")
+            sys.exit(1)
+
+    return data
+
+
+def save_config(data: dict[str, Any]) -> None:
+    """Save dictionary to config.json formatted with indents."""
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+
+
 def cmd_encrypt() -> None:
-    """Encrypt all plaintext secrets in config.json."""
-    config = load_config()
+    """Encrypt all plaintext secrets in config.json and set password_check."""
+    config = load_config(enforce_encrypted=False)
     if "secrets" not in config:
         print_warn("No 'secrets' block found in config.json")
         return
@@ -151,42 +194,26 @@ def cmd_encrypt() -> None:
         print_err("Passphrase cannot be empty")
         sys.exit(1)
 
-    # Only confirm in interactive mode if not reading from env
     if not os.environ.get("JC_PASSPHRASE") and sys.stdin.isatty():
         confirm = getpass.getpass("Confirm encryption passphrase: ")
         if passphrase != confirm:
             print_err("Passphrases do not match")
             sys.exit(1)
 
+    # If password_check already exists and was encrypted, verify passphrase before re-encrypting
+    existing_check = config["secrets"].get("password_check")
+    if existing_check and is_encrypted(existing_check):
+        if not verify_password(existing_check, passphrase):
+            print_err("Incorrect passphrase! Cannot encrypt with a different passphrase without clearing password_check.")
+            sys.exit(1)
+
+    # Set password self-encrypted check
+    config["secrets"]["password_check"] = encrypt_value(passphrase, passphrase)
+
+    # Encrypt all other secrets
     config["secrets"] = map_secrets(config["secrets"], encrypt_value, passphrase)
     save_config(config)
-    print_ok(f"Encrypted secrets in {CONFIG_FILE}")
-
-
-def cmd_decrypt() -> None:
-    """Decrypt all encrypted secrets in config.json."""
-    if not CONFIG_FILE.is_file():
-        print_err(f"{CONFIG_FILE} does not exist")
-        sys.exit(1)
-
-    config = load_config()
-    if "secrets" not in config:
-        print_warn("No 'secrets' block found in config.json")
-        return
-
-    passphrase = prompt_passphrase("Enter decryption passphrase: ")
-    if not passphrase:
-        print_err("Passphrase cannot be empty")
-        sys.exit(1)
-
-    try:
-        config["secrets"] = map_secrets(config["secrets"], decrypt_value, passphrase)
-        save_config(config)
-        print_ok(f"Decrypted secrets in {CONFIG_FILE}")
-    except ValueError as err:
-        print_err(f"Decryption failed (incorrect passphrase or corrupted data): {err}")
-        sys.exit(1)
-
+    print_ok(f"All secrets successfully encrypted in {CONFIG_FILE}")
 
 
 def check_node() -> None:
@@ -239,24 +266,26 @@ def check_supabase() -> None:
 
     print_ok(f"Configuration file found: {CONFIG_FILE}")
     try:
-        config = load_config()
+        config = load_config(enforce_encrypted=True)
         sb = config.get("secrets", {}).get("supabase", {})
         url = sb.get("url", "")
         key = sb.get("anon_key", "")
+        pwd_check = config.get("secrets", {}).get("password_check", "")
+
+        if pwd_check:
+            print_ok("Passphrase verification secret present (password_check)")
+        else:
+            print_err("Passphrase verification secret missing (run './jctool encrypt')")
 
         if url:
-            enc_str = " (encrypted)" if url.startswith(ENC_PREFIX) else ""
-            print_ok(f"Supabase URL configured{enc_str}: {url}")
+            print_ok("Supabase URL configured (encrypted)")
         else:
-            print_err("Supabase URL missing in config.json (secrets.supabase.url)")
+            print_err("Supabase URL missing in config.json")
 
         if key:
-            if key.startswith(ENC_PREFIX):
-                print_ok("Supabase Anon Key configured (encrypted)")
-            else:
-                print_warn("Supabase Anon Key is stored in PLAINTEXT (run './jctool encrypt')")
+            print_ok("Supabase Anon Key configured (encrypted)")
         else:
-            print_err("Supabase Anon Key missing in config.json (secrets.supabase.anon_key)")
+            print_err("Supabase Anon Key missing in config.json")
     except Exception as err:
         print_err(f"Error reading {CONFIG_FILE}: {err}")
 
@@ -324,7 +353,6 @@ def show_help() -> None:
     print("  install  Install Node.js & npm into ~/.cache/junta-cycle")
     print("  check    Verify required tools and credentials (Node, Git/GitHub, Supabase)")
     print("  encrypt  Encrypt plaintext secrets in config.json (prefixed with enc-v1:)")
-    print("  decrypt  Decrypt encrypted secrets in config.json")
     print("  help     Show this help message")
 
 
@@ -334,7 +362,6 @@ def main() -> None:
         "install": cmd_install,
         "check": cmd_check,
         "encrypt": cmd_encrypt,
-        "decrypt": cmd_decrypt,
         "help": show_help,
         "--help": show_help,
         "-h": show_help,

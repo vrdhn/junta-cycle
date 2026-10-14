@@ -1,5 +1,6 @@
 {
   "secrets": {
+    "password_check": "",
     "supabase": {
       "url": "",
       "anon_key": ""

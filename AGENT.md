@@ -28,19 +28,21 @@
 - **`./jctool`**: Project management script in Python (standard library only, zero external dependencies).
   - `./jctool install`: Installs Node.js & npm into `~/.cache/junta-cycle/nodejs` (isolated, non-system).
   - `./jctool check`: Verifies Node/npm runtime in cache, Git/GitHub credentials, and Supabase keys in `config.json`.
-  - `./jctool encrypt`: Encrypts plaintext strings under `"secrets"` in `config.json` with prefix `enc-v1:` using OpenSSL AES-256-CBC PBKDF2.
-  - `./jctool decrypt`: Decrypts `enc-v1:` strings in `config.json` using console-prompted passphrase.
+  - `./jctool encrypt`: Encrypts plaintext strings under `"secrets"` in `config.json` with prefix `enc-v1:` using OpenSSL AES-256-CBC PBKDF2, and saves `password_check`.
 
 ## Configuration & Secrets Management
 - File: `config.json`
 - Top-level `"secrets"` object contains sensitive service configurations (e.g. `"supabase"`: `url`, `anon_key`).
+- **Strict Encryption Policy**: All values under `"secrets"` must always be encrypted with prefix `enc-v*:`. If any value is unencrypted, `jctool` immediately terminates execution with an error telling the user to run `./jctool encrypt` (except for `jctool encrypt` itself).
+- **No Decrypt Command**: Decryption to plaintext disk is disallowed.
+- **Passphrase Verification**: The passphrase itself is encrypted with itself and stored as `secrets.password_check`. When a passphrase is provided, it is validated against this secret.
 - Encryption scheme: OpenSSL AES-256-CBC, PBKDF2 with 100,000 iterations and salt.
 - Encrypted format: `enc-v1:<base64-ciphertext>`
-- Passphrase is asked interactively from the console (hidden input via `getpass`).
 
 ## Current Status & Next Steps
 - Node.js (v22.11.0) and npm (10.9.0) managed in `~/.cache/junta-cycle/nodejs`.
-- Converted `jctool` to Python stdlib; tested `install`, `check`, `encrypt`, and `decrypt`.
-- Initial `config.json` template created.
+- `jctool` enforces `enc-v*:` prefix on all secrets; verifies passphrases using self-encrypted `password_check`.
+- Template `config.json` ready for user credentials.
+
 
 
