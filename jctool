@@ -353,6 +353,34 @@ def cmd_check() -> None:
     print("\nCheck complete.")
 
 
+def get_decrypted_frontend_env() -> dict[str, str]:
+    """Retrieve decrypted Supabase URL and Publishable Key for frontend build/dev."""
+    url = os.environ.get("VITE_SUPABASE_URL", "")
+    key = os.environ.get("VITE_SUPABASE_ANON_KEY", "")
+    if url and key:
+        return {"VITE_SUPABASE_URL": url, "VITE_SUPABASE_ANON_KEY": key}
+
+    config = load_config(enforce_encrypted=True)
+    sb = config.get("secrets", {}).get("supabase", {})
+    enc_url = sb.get("url", "")
+    enc_key = sb.get("anon_key", "") or sb.get("publishable_key", "")
+
+    if not enc_url or not enc_key:
+        print_warn("Supabase credentials not configured in config.json")
+        return {}
+
+    passphrase = prompt_passphrase("Enter passphrase to decrypt frontend configuration: ")
+    check_val = config.get("secrets", {}).get("password_check", "")
+    if check_val and not verify_password(check_val, passphrase):
+        print_err("Incorrect passphrase!")
+        sys.exit(1)
+
+    return {
+        "VITE_SUPABASE_URL": decrypt_value(enc_url, passphrase),
+        "VITE_SUPABASE_ANON_KEY": decrypt_value(enc_key, passphrase),
+    }
+
+
 def cmd_build() -> None:
     """Build the frontend application into frontend/dist."""
     ensure_cached_path()
@@ -360,8 +388,10 @@ def cmd_build() -> None:
     if not npm_exe.is_file():
         print_err(f"npm not found in {NODE_BIN_DIR}. Run './jctool install' first.")
         sys.exit(1)
+    frontend_env = get_decrypted_frontend_env()
+    env = {**os.environ, **frontend_env}
     print("Building frontend...")
-    res = subprocess.run([str(npm_exe), "--prefix", "frontend", "run", "build"], check=False)
+    res = subprocess.run([str(npm_exe), "--prefix", "frontend", "run", "build"], env=env, check=False)
     if res.returncode == 0:
         print_ok("Frontend built successfully into frontend/dist")
     else:
@@ -375,7 +405,10 @@ def cmd_dev() -> None:
     if not npm_exe.is_file():
         print_err(f"npm not found in {NODE_BIN_DIR}. Run './jctool install' first.")
         sys.exit(1)
-    subprocess.run([str(npm_exe), "--prefix", "frontend", "run", "dev"], check=False)
+    frontend_env = get_decrypted_frontend_env()
+    env = {**os.environ, **frontend_env}
+    subprocess.run([str(npm_exe), "--prefix", "frontend", "run", "dev"], env=env, check=False)
+
 
 
 def git_tree_from_dir(directory: Path) -> str:

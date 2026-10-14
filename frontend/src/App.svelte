@@ -1,11 +1,16 @@
 <script lang="ts">
+  import StatusBar from "./lib/StatusBar.svelte";
+
   function handleLogin() {
     alert("Supabase Auth flow will start here.");
   }
 </script>
 
+<StatusBar />
+
 <main class="welcome-container">
   <div class="hero-card">
+
     <div class="logo-icon">🚲</div>
     <h1>Welcome to Junta Cycles</h1>
     <p class="tagline">Smart community bicycle sharing for your daily commute.</p>
