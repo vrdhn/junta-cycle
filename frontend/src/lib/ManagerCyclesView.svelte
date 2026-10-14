@@ -50,6 +50,7 @@
   // Printable QR modal state
   let selectedCycleForQr = $state<Cycle | null>(null);
   let qrImageUrl = $state<string>("");
+  let scanUrl = $state<string>("");
 
   async function loadStands() {
     loading = true;
@@ -180,10 +181,17 @@
     }
   }
 
+  function getScanUrl(qrId: string): string {
+    const origin = window.location.origin;
+    const pathname = window.location.pathname.replace(/\/+$/, "").replace(/\/(?:app|debug|users)$/, "");
+    return `${origin}${pathname}/scan/${qrId}`;
+  }
+
   async function openQrPopup(cycle: Cycle) {
     selectedCycleForQr = cycle;
+    scanUrl = getScanUrl(cycle.qr_id);
     try {
-      qrImageUrl = await QRCode.toDataURL(cycle.qr_id, {
+      qrImageUrl = await QRCode.toDataURL(scanUrl, {
         width: 250,
         margin: 1,
         color: {
@@ -199,6 +207,7 @@
   function closeQrPopup() {
     selectedCycleForQr = null;
     qrImageUrl = "";
+    scanUrl = "";
   }
 
   function printSticker() {
@@ -403,18 +412,14 @@
           </div>
 
           <div class="sticker-uuid-box">
-            <span class="uuid-lbl">QR UUID:</span>
-            <span class="uuid-txt">{selectedCycleForQr.qr_id}</span>
+            <span class="uuid-lbl">Scan URL:</span>
+            <span class="uuid-txt">{scanUrl}</span>
           </div>
 
           <div class="sticker-info-rows">
             <div class="sticker-info-row">
               <span class="info-k">Cycle:</span>
               <span class="info-v">{selectedCycleForQr.company_name} - {selectedCycleForQr.model_number} ({selectedCycleForQr.color})</span>
-            </div>
-            <div class="sticker-info-row lock-highlight">
-              <span class="info-k">Lock Combination:</span>
-              <span class="info-v lock-text">🔒 {selectedCycleForQr.lock_code}</span>
             </div>
             {#if getStandName(selectedCycleForQr.parking_id)}
               <div class="sticker-info-row">
@@ -425,7 +430,7 @@
           </div>
 
           <div class="sticker-footer-note">
-            Scan QR code with Junta Cycle App to unlock ride
+            Scan QR code with your phone camera or Junta Cycle App to unlock ride
           </div>
         </div>
 
@@ -935,26 +940,6 @@
     font-weight: 700;
     color: #0f172a;
     text-align: right;
-  }
-
-  .lock-highlight {
-    background: #fef3c7;
-    padding: 0.35rem 0.5rem;
-    border-radius: 0.35rem;
-    border: 1px solid #fde68a;
-  }
-
-  .lock-highlight .info-k {
-    color: #92400e;
-    font-weight: 800;
-  }
-
-  .lock-text {
-    font-family: monospace;
-    font-size: 1.05rem;
-    letter-spacing: 0.1em;
-    color: #b45309;
-    font-weight: 900;
   }
 
   .sticker-footer-note {
