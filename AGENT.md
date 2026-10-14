@@ -41,8 +41,9 @@
 
 ## Current Status & Next Steps
 - Node.js (v22.11.0) and npm (10.9.0) managed in `~/.cache/junta-cycle/nodejs`.
-- `jctool` enforces `enc-v*:` prefix on all secrets; verifies passphrases using self-encrypted `password_check`.
-- Template `config.json` ready for user credentials.
+- Supabase project URL, Publishable Key, and Database Password configured and encrypted in `config.json`.
+- All checks in `./jctool check` passing.
+
 
 
 

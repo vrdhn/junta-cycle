@@ -269,7 +269,7 @@ def check_supabase() -> None:
         config = load_config(enforce_encrypted=True)
         sb = config.get("secrets", {}).get("supabase", {})
         url = sb.get("url", "")
-        key = sb.get("anon_key", "")
+        key = sb.get("anon_key", "") or sb.get("publishable_key", "")
         pwd_check = config.get("secrets", {}).get("password_check", "")
 
         if pwd_check:
@@ -283,9 +283,10 @@ def check_supabase() -> None:
             print_err("Supabase URL missing in config.json")
 
         if key:
-            print_ok("Supabase Anon Key configured (encrypted)")
+            print_ok("Supabase Publishable/Anon Key configured (encrypted)")
         else:
-            print_err("Supabase Anon Key missing in config.json")
+            print_err("Supabase Publishable/Anon Key missing in config.json")
+
 
         db_pwd = sb.get("database-password", "")
         if db_pwd:
