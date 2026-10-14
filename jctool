@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""junta-cycle project management tool (jctool).
+
+Uses only Python standard library.
+"""
+
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import tarfile
+import urllib.request
+from pathlib import Path
+
+CACHE_DIR = Path.home() / ".cache" / "junta-cycle"
+NODE_DIR = CACHE_DIR / "nodejs"
+NODE_BIN_DIR = NODE_DIR / "bin"
+NODE_VERSION = "v22.11.0"
+
+# ANSI Colors
+GREEN = "\033[0;32m"
+YELLOW = "\033[1;33m"
+RED = "\033[0;31m"
+BLUE = "\033[0;34m"
+RESET = "\033[0m"
+
+
+def print_header(title: str) -> None:
+    print(f"{BLUE}=== {title} ==={RESET}")
+
+
+def print_ok(message: str) -> None:
+    print(f"  [{GREEN}OK{RESET}] {message}")
+
+
+def print_warn(message: str) -> None:
+    print(f"  [{YELLOW}WARN{RESET}] {message}")
+
+
+def print_err(message: str) -> None:
+    print(f"  [{RED}MISSING{RESET}] {message}")
+
+
+def ensure_cached_path() -> None:
+    """Prepend cached nodejs bin to PATH if it exists."""
+    if NODE_BIN_DIR.is_dir():
+        current_path = os.environ.get("PATH", "")
+        node_bin_str = str(NODE_BIN_DIR)
+        if node_bin_str not in current_path.split(os.pathsep):
+            os.environ["PATH"] = f"{node_bin_str}{os.pathsep}{current_path}"
+
+
+def run_command(cmd: list[str]) -> tuple[int, str]:
+    """Run a command and return exit code and stripped output."""
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        return res.returncode, res.stdout.strip()
+    except FileNotFoundError:
+        return 127, ""
+
+
+def check_node() -> None:
+    """Verify Node.js and npm in cache directory."""
+    print("\nChecking Node runtime (managed in ~/.cache/junta-cycle):")
+    node_exe = NODE_BIN_DIR / "node"
+    npm_exe = NODE_BIN_DIR / "npm"
+
+    if node_exe.is_file() and os.access(node_exe, os.X_OK):
+        _, ver = run_command([str(node_exe), "-v"])
+        print_ok(f"node found at {node_exe} ({ver})")
+    else:
+        print_err(f"node not found in {NODE_BIN_DIR} (run './jctool install' to install)")
+
+    if npm_exe.is_file() and os.access(npm_exe, os.X_OK):
+        _, ver = run_command([str(npm_exe), "-v"])
+        print_ok(f"npm found at {npm_exe} ({ver})")
+    else:
+        print_err(f"npm not found in {NODE_BIN_DIR}")
+
+
+def check_github() -> None:
+    """Verify git and GitHub CLI configuration."""
+    print("\nChecking GitHub credentials & git configuration:")
+    code_name, git_name = run_command(["git", "config", "--get", "user.name"])
+    code_email, git_email = run_command(["git", "config", "--get", "user.email"])
+
+    if code_name == 0 and code_email == 0 and git_name and git_email:
+        print_ok(f"git user configured: {git_name} <{git_email}>")
+    else:
+        print_warn("git user.name or user.email not configured")
+
+    gh_code, _ = run_command(["gh", "auth", "status"])
+    if gh_code == 0:
+        print_ok("gh CLI authenticated")
+    elif gh_code == 127:
+        print_warn("gh CLI not found (optional, but helpful for GitHub automation)")
+    else:
+        print_warn("gh CLI installed but not authenticated ('gh auth login')")
+
+
+def check_supabase() -> None:
+    """Verify Supabase configuration in config.json or environment."""
+    print("\nChecking Supabase configuration:")
+    config_file = Path("config.json")
+    sb_url = os.environ.get("SUPABASE_URL", "")
+    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+
+    if config_file.is_file():
+        print_ok("Configuration file found: config.json")
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            supabase_conf = data.get("secrets", {}).get("supabase", {})
+            sb_url = sb_url or supabase_conf.get("url", "")
+            sb_key = sb_key or supabase_conf.get("anon_key", "")
+        except (json.JSONDecodeError, OSError) as err:
+            print_warn(f"Failed to read config.json: {err}")
+    else:
+        print_warn("No config.json file found")
+
+    if sb_url:
+        print_ok(f"Supabase URL detected: {sb_url}")
+    else:
+        print_err("Supabase URL missing (expected in config.json or SUPABASE_URL)")
+
+    if sb_key:
+        print_ok("Supabase Anon Key detected")
+    else:
+        print_err("Supabase Anon Key missing (expected in config.json or SUPABASE_ANON_KEY)")
+
+
+def cmd_install() -> None:
+    """Install Node.js into ~/.cache/junta-cycle."""
+    print_header("junta-cycle tool (jctool)")
+    machine = platform.machine().lower()
+    if machine not in ("x86_64", "amd64"):
+        print(f"Unsupported architecture: {machine}. Only x86_64 is configured.")
+        sys.exit(1)
+
+    node_exe = NODE_BIN_DIR / "node"
+    if node_exe.is_file() and os.access(node_exe, os.X_OK):
+        _, ver = run_command([str(node_exe), "-v"])
+        print_ok(f"Node.js already installed in {NODE_BIN_DIR}: {ver}")
+        return
+
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    tarball_name = f"node-{NODE_VERSION}-linux-x64.tar.xz"
+    url = f"https://nodejs.org/dist/{NODE_VERSION}/{tarball_name}"
+    tarball_path = CACHE_DIR / tarball_name
+
+    print(f"Downloading Node.js {NODE_VERSION} from {url}...")
+    urllib.request.urlretrieve(url, tarball_path)
+
+    print(f"Extracting into {NODE_DIR}...")
+    if NODE_DIR.exists():
+        shutil.rmtree(NODE_DIR)
+    NODE_DIR.mkdir(parents=True, exist_ok=True)
+
+    with tarfile.open(tarball_path, "r:xz") as tar:
+        # Strip root directory when extracting
+        members = tar.getmembers()
+        root_dir = members[0].name.split("/")[0] if members else ""
+        for member in members:
+            if "/" in member.name:
+                member.name = member.name.split("/", 1)[1]
+                tar.extract(member, path=NODE_DIR)
+
+    if tarball_path.is_file():
+        tarball_path.unlink()
+
+    ensure_cached_path()
+    _, node_ver = run_command([str(NODE_BIN_DIR / "node"), "-v"])
+    _, npm_ver = run_command([str(NODE_BIN_DIR / "npm"), "-v"])
+    print_ok(f"Installed Node.js: {node_ver}")
+    print_ok(f"Installed npm: {npm_ver}")
+
+
+def cmd_check() -> None:
+    """Run environment and credentials check."""
+    ensure_cached_path()
+    print_header("junta-cycle tool (jctool)")
+    print("Running environment and credentials check...")
+    check_node()
+    check_github()
+    check_supabase()
+    print("\nCheck complete.")
+
+
+def show_help() -> None:
+    """Show CLI usage."""
+    print_header("junta-cycle tool (jctool)")
+    print("Usage: ./jctool <command>\n")
+    print("Commands:")
+    print("  install  Install Node.js & npm into ~/.cache/junta-cycle")
+    print("  check    Verify required tools and credentials (Node, Git/GitHub, Supabase)")
+    print("  help     Show this help message")
+
+
+def main() -> None:
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
+    commands = {
+        "install": cmd_install,
+        "check": cmd_check,
+        "help": show_help,
+        "--help": show_help,
+        "-h": show_help,
+    }
+    action = commands.get(cmd)
+    if action:
+        action()
+    else:
+        print(f"Unknown command: {cmd}\n")
+        show_help()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
